@@ -5,7 +5,17 @@ Professional-grade algorithmic trading platform with ML-powered strategies, adva
 ## Quick Start
 
 ```bash
-python3 advanced_trading_interface.py
+# Clone repository
+git clone https://github.com/chrispbacon123/trader_V0.00.git
+cd trader_V0.00
+
+# Create virtual environment and install dependencies
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install pandas numpy scikit-learn yfinance matplotlib seaborn plotly scipy joblib ta-lib
+
+# Launch the platform
+./launch.sh  # Or: python advanced_trading_interface.py
 ```
 
 ## Features
@@ -33,12 +43,19 @@ python3 advanced_trading_interface.py
 
 ## Installation
 
+The quick start above covers installation. For manual setup:
+
 ```bash
-git clone https://github.com/chrispbacon123/trader_V0.00.git
-cd trader_V0.00
-pip install -r requirements.txt
-python3 advanced_trading_interface.py
+# Option 1: Using virtual environment (recommended)
+python3 -m venv venv
+source venv/bin/activate
+pip install pandas numpy scikit-learn yfinance matplotlib seaborn plotly scipy joblib ta-lib
+
+# Option 2: Using system Python (not recommended)
+pip install --user pandas numpy scikit-learn yfinance matplotlib seaborn plotly scipy joblib ta-lib
 ```
+
+**Note:** The platform requires Python 3.8+ and uses a virtual environment to avoid conflicts.
 
 ## Supported Assets
 - Stocks (NYSE, NASDAQ)
@@ -80,6 +97,32 @@ python3 advanced_trading_interface.py
 
 - GitHub Issues
 - In-app help (option `16`)
+
+## Troubleshooting
+
+### "ModuleNotFoundError: No module named 'pandas'"
+Make sure you've activated the virtual environment:
+```bash
+source venv/bin/activate  # On Mac/Linux
+```
+
+### "Insufficient data" errors
+- Short-term strategies need 20+ calendar days
+- ML strategies need 90+ calendar days  
+- Optimized ensemble needs 250+ calendar days
+- Use longer date ranges or request extended historical data
+
+### Permission denied when running ./launch.sh
+```bash
+chmod +x launch.sh
+./launch.sh
+```
+
+### General data issues
+- Check internet connection
+- Verify symbol is correct (e.g., "AAPL" not "Apple")
+- Try a different symbol (SPY usually works)
+- Weekend/market closed? Use earlier dates
 
 ---
 
