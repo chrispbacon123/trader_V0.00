@@ -46,6 +46,10 @@ from advanced_settings import AdvancedSettingsManager
 from market_analytics import MarketAnalytics
 from strategy_optimizer import StrategyOptimizer
 from strategy_builder import StrategyBuilder
+from advanced_risk_analytics import (
+    AdvancedRiskAnalytics, MonteCarloSimulator,
+    WalkForwardOptimizer, calculate_regime_metrics
+)
 
 
 class Portfolio:
@@ -204,10 +208,15 @@ class AdvancedTradingInterface:
         print("  9. Manage Saved Strategies")
         print(" 10. Advanced Settings")
         print()
+        print("📈 ADVANCED ANALYTICS")
+        print(" 11. Monte Carlo Simulation")
+        print(" 12. Walk-Forward Analysis")
+        print(" 13. Advanced Risk Metrics")
+        print()
         print("🚀 DEPLOYMENT & REPORTING")
-        print(" 11. Export Strategy for Live Trading")
-        print(" 12. View Performance Reports")
-        print(" 13. Help & Documentation")
+        print(" 14. Export Strategy for Live Trading")
+        print(" 15. View Performance Reports")
+        print(" 16. Help & Documentation")
         print()
         print("  0. Exit")
         print("═" * 90)
@@ -3012,6 +3021,278 @@ class AdvancedTradingInterface:
             if choice != '0':
                 input("\nPress Enter to continue...")
     
+    def run_monte_carlo_simulation(self):
+        """Run Monte Carlo simulation for risk analysis"""
+        print("\n" + "═"*90)
+        print("MONTE CARLO SIMULATION")
+        print("═"*90)
+        
+        # Get strategy or use last result
+        if not self.results_history:
+            print("\n❌ No historical results available. Please run a backtest first.")
+            return
+        
+        # Get symbol
+        symbol = input("\nEnter symbol (or 'last' for most recent): ").strip().upper()
+        if symbol == 'LAST' and self.results_history:
+            symbol = self.results_history[-1]['symbol']
+        
+        # Get number of simulations
+        try:
+            num_sims = int(input("Number of simulations (default 1000): ") or "1000")
+            periods = int(input("Periods to simulate (default 252 = 1 year): ") or "252")
+            initial_capital = float(input("Initial capital (default 100000): ") or "100000")
+        except ValueError:
+            print("❌ Invalid input!")
+            return
+        
+        print(f"\n🔄 Running Monte Carlo simulation...")
+        print(f"Symbol: {symbol}, Simulations: {num_sims}, Periods: {periods}")
+        
+        try:
+            # Get historical data
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=365)
+            data = yf.download(symbol, start=start_date, end=end_date, progress=False)
+            
+            if len(data) < 20:
+                print(f"❌ Insufficient historical data for {symbol}")
+                return
+            
+            # Calculate returns
+            returns = data['Close'].pct_change().dropna()
+            
+            # Run simulation
+            simulator = MonteCarloSimulator(returns)
+            paths = simulator.simulate_paths(num_sims, periods, initial_capital)
+            
+            # Calculate statistics
+            final_values = paths[:, -1]
+            prob_profit = simulator.probability_of_profit(paths)
+            expected_return = (final_values.mean() - initial_capital) / initial_capital * 100
+            
+            # Calculate percentiles
+            percentiles = simulator.confidence_intervals(paths, [0.05, 0.25, 0.50, 0.75, 0.95])
+            
+            # Display results
+            print("\n" + "─"*90)
+            print("SIMULATION RESULTS")
+            print("─"*90)
+            print(f"Initial Capital:        ${initial_capital:,.2f}")
+            print(f"Expected Final Value:   ${final_values.mean():,.2f}")
+            print(f"Expected Return:        {expected_return:,.2f}%")
+            print(f"Probability of Profit:  {prob_profit*100:.2f}%")
+            print()
+            print("PERCENTILES (Final Values):")
+            print(f"  5th:  ${percentiles[0.05][-1]:,.2f}")
+            print(f" 25th:  ${percentiles[0.25][-1]:,.2f}")
+            print(f" 50th:  ${percentiles[0.50][-1]:,.2f}")
+            print(f" 75th:  ${percentiles[0.75][-1]:,.2f}")
+            print(f" 95th:  ${percentiles[0.95][-1]:,.2f}")
+            print()
+            print(f"Best Case (95th):    {((percentiles[0.95][-1] - initial_capital) / initial_capital * 100):.2f}%")
+            print(f"Worst Case (5th):    {((percentiles[0.05][-1] - initial_capital) / initial_capital * 100):.2f}%")
+            
+            # Save results
+            result = {
+                'timestamp': datetime.now().isoformat(),
+                'type': 'Monte Carlo Simulation',
+                'symbol': symbol,
+                'num_simulations': num_sims,
+                'periods': periods,
+                'initial_capital': initial_capital,
+                'expected_return': expected_return,
+                'probability_of_profit': prob_profit * 100,
+                'percentiles': {k: v[-1] for k, v in percentiles.items()}
+            }
+            self.results_history.append(result)
+            
+            print("\n✅ Simulation completed successfully!")
+            
+        except Exception as e:
+            print(f"\n❌ Error running simulation: {e}")
+    
+    def run_walk_forward_analysis(self):
+        """Run walk-forward optimization analysis"""
+        print("\n" + "═"*90)
+        print("WALK-FORWARD ANALYSIS")
+        print("═"*90)
+        print("\nThis feature tests strategy robustness by optimizing on historical data")
+        print("and testing on out-of-sample periods.")
+        
+        # Get symbol
+        symbol = input("\nEnter symbol: ").strip().upper()
+        if not symbol:
+            print("❌ Symbol required!")
+            return
+        
+        # Get parameters
+        try:
+            in_sample_days = int(input("In-sample period (days, default 252): ") or "252")
+            out_sample_days = int(input("Out-of-sample period (days, default 63): ") or "63")
+            total_days = int(input("Total history (days, default 756 = 3 years): ") or "756")
+        except ValueError:
+            print("❌ Invalid input!")
+            return
+        
+        print(f"\n🔄 Running walk-forward analysis on {symbol}...")
+        
+        try:
+            # Get data
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=total_days + 100)
+            data = yf.download(symbol, start=start_date, end=end_date, progress=False)
+            
+            if len(data) < in_sample_days + out_sample_days:
+                print(f"❌ Insufficient data. Need at least {in_sample_days + out_sample_days} days")
+                return
+            
+            # Initialize optimizer
+            optimizer = WalkForwardOptimizer(in_sample_days, out_sample_days)
+            windows = optimizer.generate_windows(len(data))
+            
+            print(f"\n📊 Generated {len(windows)} walk-forward windows")
+            
+            in_sample_returns = []
+            out_sample_returns = []
+            
+            # Run through each window
+            for i, (in_start, in_end, out_start, out_end) in enumerate(windows, 1):
+                print(f"\rProcessing window {i}/{len(windows)}...", end='', flush=True)
+                
+                # Get in-sample and out-of-sample data
+                in_data = data.iloc[in_start:in_end]
+                out_data = data.iloc[out_start:out_end]
+                
+                # Simple return calculation
+                in_return = ((in_data['Close'].iloc[-1] - in_data['Close'].iloc[0]) / 
+                            in_data['Close'].iloc[0] * 100)
+                out_return = ((out_data['Close'].iloc[-1] - out_data['Close'].iloc[0]) / 
+                             out_data['Close'].iloc[0] * 100)
+                
+                in_sample_returns.append(in_return)
+                out_sample_returns.append(out_return)
+            
+            print("\n")
+            
+            # Calculate efficiency
+            efficiency = optimizer.efficiency_ratio(in_sample_returns, out_sample_returns)
+            
+            # Display results
+            print("\n" + "─"*90)
+            print("WALK-FORWARD ANALYSIS RESULTS")
+            print("─"*90)
+            print(f"Number of Windows:           {len(windows)}")
+            print(f"In-Sample Period:            {in_sample_days} days")
+            print(f"Out-of-Sample Period:        {out_sample_days} days")
+            print()
+            print("IN-SAMPLE PERFORMANCE:")
+            print(f"  Average Return:            {np.mean(in_sample_returns):.2f}%")
+            print(f"  Std Deviation:             {np.std(in_sample_returns):.2f}%")
+            print(f"  Win Rate:                  {(np.array(in_sample_returns) > 0).mean()*100:.2f}%")
+            print()
+            print("OUT-OF-SAMPLE PERFORMANCE:")
+            print(f"  Average Return:            {np.mean(out_sample_returns):.2f}%")
+            print(f"  Std Deviation:             {np.std(out_sample_returns):.2f}%")
+            print(f"  Win Rate:                  {(np.array(out_sample_returns) > 0).mean()*100:.2f}%")
+            print()
+            print(f"WALK-FORWARD EFFICIENCY:     {efficiency:.2f}")
+            print("  (>0.5 indicates robust strategy)")
+            
+            # Save results
+            result = {
+                'timestamp': datetime.now().isoformat(),
+                'type': 'Walk-Forward Analysis',
+                'symbol': symbol,
+                'num_windows': len(windows),
+                'in_sample_avg': np.mean(in_sample_returns),
+                'out_sample_avg': np.mean(out_sample_returns),
+                'efficiency': efficiency
+            }
+            self.results_history.append(result)
+            
+            print("\n✅ Walk-forward analysis completed!")
+            
+        except Exception as e:
+            print(f"\n❌ Error in walk-forward analysis: {e}")
+    
+    def show_advanced_risk_metrics(self):
+        """Display advanced risk metrics"""
+        print("\n" + "═"*90)
+        print("ADVANCED RISK METRICS")
+        print("═"*90)
+        
+        # Get symbol
+        symbol = input("\nEnter symbol (or 'last' for most recent): ").strip().upper()
+        if symbol == 'LAST' and self.results_history:
+            symbol = self.results_history[-1]['symbol']
+        
+        if not symbol:
+            print("❌ Symbol required!")
+            return
+        
+        print(f"\n🔄 Calculating advanced risk metrics for {symbol}...")
+        
+        try:
+            # Get historical data
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=365)
+            data = yf.download(symbol, start=start_date, end=end_date, progress=False)
+            
+            if len(data) < 50:
+                print(f"❌ Insufficient data for {symbol}")
+                return
+            
+            # Calculate returns
+            returns = data['Close'].pct_change().dropna()
+            
+            # Initialize analytics
+            analytics = AdvancedRiskAnalytics(returns)
+            metrics = analytics.generate_full_report()
+            
+            # Display metrics
+            print("\n" + "─"*90)
+            print(f"ADVANCED RISK METRICS - {symbol}")
+            print("─"*90)
+            print("\nVALUE AT RISK (VaR):")
+            print(f"  Historical VaR (95%):      {metrics['VaR (Historical)']*100:.2f}%")
+            print(f"  Parametric VaR (95%):      {metrics['VaR (Parametric)']*100:.2f}%")
+            print(f"  Conditional VaR (CVaR):    {metrics['CVaR']*100:.2f}%")
+            print("\nDRAWDOWN METRICS:")
+            print(f"  Max DD Duration (days):    {metrics['Max DD Duration']}")
+            print(f"  Ulcer Index:               {metrics['Ulcer Index']:.2f}")
+            print("\nRISK-ADJUSTED RETURNS:")
+            print(f"  Calmar Ratio:              {metrics['Calmar Ratio']:.2f}")
+            print(f"  Burke Ratio:               {metrics['Burke Ratio']:.2f}")
+            print(f"  Omega Ratio:               {metrics['Omega Ratio']:.2f}")
+            print(f"  Gain/Pain Ratio:           {metrics['Gain/Pain Ratio']:.2f}")
+            print("\nDISTRIBUTION METRICS:")
+            print(f"  Tail Ratio:                {metrics['Tail Ratio']:.2f}")
+            
+            # Regime analysis
+            regimes = calculate_regime_metrics(returns)
+            regime_dist = regimes['regime'].value_counts()
+            
+            print("\nMARKET REGIME DISTRIBUTION:")
+            for regime, count in regime_dist.items():
+                pct = count / len(regimes) * 100
+                print(f"  {regime:20s} {pct:>6.2f}%")
+            
+            # Save results
+            result = {
+                'timestamp': datetime.now().isoformat(),
+                'type': 'Advanced Risk Metrics',
+                'symbol': symbol,
+                'metrics': {k: float(v) if isinstance(v, (int, float, np.number)) else v 
+                           for k, v in metrics.items()}
+            }
+            self.results_history.append(result)
+            
+            print("\n✅ Risk analysis completed!")
+            
+        except Exception as e:
+            print(f"\n❌ Error calculating metrics: {e}")
+    
     def run(self):
         """Main interface loop"""
         while True:
@@ -3054,12 +3335,21 @@ class AdvancedTradingInterface:
                 self.advanced_settings_menu()
                 input("\n\nPress Enter to continue...")
             elif choice == '11':
-                self.export_strategy_for_live()
+                self.run_monte_carlo_simulation()
                 input("\n\nPress Enter to continue...")
             elif choice == '12':
-                self.view_performance_reports()
+                self.run_walk_forward_analysis()
                 input("\n\nPress Enter to continue...")
             elif choice == '13':
+                self.show_advanced_risk_metrics()
+                input("\n\nPress Enter to continue...")
+            elif choice == '14':
+                self.export_strategy_for_live()
+                input("\n\nPress Enter to continue...")
+            elif choice == '15':
+                self.view_performance_reports()
+                input("\n\nPress Enter to continue...")
+            elif choice == '16':
                 self.show_help()
                 input("\n\nPress Enter to continue...")
             else:
