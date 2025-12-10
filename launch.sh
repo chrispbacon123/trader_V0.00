@@ -3,6 +3,9 @@
 
 cd "$(dirname "$0")"
 
+# Activate virtual environment
+source venv/bin/activate
+
 echo "🚀 Launching Trading Strategy CLI..."
 echo ""
-python3 trading_cli.py
+python advanced_trading_interface.py
