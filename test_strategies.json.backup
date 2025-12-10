@@ -1,0 +1,22 @@
+{
+  "Test_Short_Term_SPY": {
+    "name": "Test_Short_Term_SPY",
+    "strategy_type": "ShortTermStrategy",
+    "parameters": {
+      "symbol": "SPY",
+      "lookback": 14,
+      "entry_threshold": 0.02,
+      "initial_capital": 100000
+    },
+    "description": "Short-term strategy for SPY testing",
+    "tags": [
+      "short-term",
+      "spy",
+      "test"
+    ],
+    "created_at": "2025-12-08T17:45:54.632081",
+    "last_modified": "2025-12-08T17:45:54.632081",
+    "performance_history": [],
+    "metadata": {}
+  }
+}
