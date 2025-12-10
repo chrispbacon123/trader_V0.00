@@ -29,6 +29,9 @@ from enhanced_utils import (
     NetworkError, download_data_with_retry
 )
 
+# Import unified backtest engine
+from unified_backtest_engine import UnifiedBacktestEngine
+
 # Import strategy exporter
 try:
     from strategy_exporter import StrategyExporter
@@ -89,6 +92,7 @@ class AdvancedTradingInterface:
         self.strategy_manager = StrategyManager()
         self.advanced_settings = AdvancedSettingsManager()
         self.strategy_builder = StrategyBuilder()
+        self.backtest_engine = UnifiedBacktestEngine()
         self.load_all_data()
         
     def load_sector_data(self):
@@ -1091,52 +1095,72 @@ class AdvancedTradingInterface:
                 print(f"\n→ Testing Simple strategy ({allocations['Simple']:.0f}%)...")
                 capital_allocated = portfolio.initial_capital * (allocations['Simple'] / 100)
                 strategy = SimpleMeanReversionStrategy(symbol=symbol, lookback=20, std_dev=2)
-                strategy.cash = capital_allocated
-                data, trades, final_value, equity = strategy.backtest(start_date, end_date)
+                
+                result = self.backtest_engine.run_backtest(
+                    strategy=strategy,
+                    symbol=symbol,
+                    start_date=start_date,
+                    end_date=end_date,
+                    initial_capital=capital_allocated
+                )
+                
                 results['Simple'] = {
                     'allocation': allocations['Simple'],
                     'initial': capital_allocated,
-                    'final': final_value,
-                    'return_pct': ((final_value - capital_allocated) / capital_allocated) * 100,
-                    'trades': len(trades)
+                    'final': result.final_value,
+                    'return_pct': result.total_return,
+                    'trades': len(result.trades)
                 }
-                total_value += final_value
-                print(f"   Result: ${capital_allocated:,.0f} → ${final_value:,.0f} ({results['Simple']['return_pct']:.2f}%)")
+                total_value += result.final_value
+                print(f"   Result: ${capital_allocated:,.0f} → ${result.final_value:,.0f} ({result.total_return:.2f}%)")
             
             if allocations.get('ML', 0) > 0:
                 print(f"\n→ Testing ML strategy ({allocations['ML']:.0f}%)...")
                 capital_allocated = portfolio.initial_capital * (allocations['ML'] / 100)
                 strategy = MLTradingStrategy(symbol=symbol, lookback=60, prediction_horizon=5)
-                strategy.cash = capital_allocated
-                df_test, trades, final_value, equity = strategy.backtest(start_date, end_date)
+                
+                result = self.backtest_engine.run_backtest(
+                    strategy=strategy,
+                    symbol=symbol,
+                    start_date=start_date,
+                    end_date=end_date,
+                    initial_capital=capital_allocated
+                )
+                
                 results['ML'] = {
                     'allocation': allocations['ML'],
                     'initial': capital_allocated,
-                    'final': final_value,
-                    'return_pct': ((final_value - capital_allocated) / capital_allocated) * 100,
-                    'trades': len(trades)
+                    'final': result.final_value,
+                    'return_pct': result.total_return,
+                    'trades': len(result.trades)
                 }
-                total_value += final_value
-                print(f"   Result: ${capital_allocated:,.0f} → ${final_value:,.0f} ({results['ML']['return_pct']:.2f}%)")
+                total_value += result.final_value
+                print(f"   Result: ${capital_allocated:,.0f} → ${result.final_value:,.0f} ({result.total_return:.2f}%)")
             
             if allocations.get('Optimized', 0) > 0:
                 print(f"\n→ Testing Optimized strategy ({allocations['Optimized']:.0f}%)...")
                 capital_allocated = portfolio.initial_capital * (allocations['Optimized'] / 100)
                 strategy = OptimizedMLStrategy(symbol=symbol, lookback=60, prediction_horizon=5)
-                strategy.cash = capital_allocated
-                strategy.initial_cash = capital_allocated
-                df_test, trades, final_value, equity = strategy.backtest(
-                    start_date, end_date, optimize_params=True, n_trials=10
+                
+                result = self.backtest_engine.run_backtest(
+                    strategy=strategy,
+                    symbol=symbol,
+                    start_date=start_date,
+                    end_date=end_date,
+                    initial_capital=capital_allocated,
+                    optimize_params=True,
+                    n_trials=10
                 )
+                
                 results['Optimized'] = {
                     'allocation': allocations['Optimized'],
                     'initial': capital_allocated,
-                    'final': final_value,
-                    'return_pct': ((final_value - capital_allocated) / capital_allocated) * 100,
-                    'trades': len(trades)
+                    'final': result.final_value,
+                    'return_pct': result.total_return,
+                    'trades': len(result.trades)
                 }
-                total_value += final_value
-                print(f"   Result: ${capital_allocated:,.0f} → ${final_value:,.0f} ({results['Optimized']['return_pct']:.2f}%)")
+                total_value += result.final_value
+                print(f"   Result: ${capital_allocated:,.0f} → ${result.final_value:,.0f} ({result.total_return:.2f}%)")
             
             # Print portfolio summary
             portfolio_return = ((total_value - portfolio.initial_capital) / portfolio.initial_capital) * 100
