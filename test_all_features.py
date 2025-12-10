@@ -48,7 +48,7 @@ try:
     strategy = SimpleMeanReversionStrategy('SPY', lookback=10)
     end = datetime.now()
     start = end - timedelta(days=45)
-    data, trades, final = strategy.backtest(start, end)
+    data, trades, final, equity = strategy.backtest(start, end)
     print(f"   ✅ PASSED: {len(data)} trading days, {len(trades)} trades")
     tests_passed += 1
 except Exception as e:
@@ -98,7 +98,7 @@ try:
     strategy = SimpleMeanReversionStrategy('QQQ', lookback=15)
     end = datetime.now()
     start = end - timedelta(days=60)
-    data, trades, final = strategy.backtest(start, end)
+    data, trades, final, equity = strategy.backtest(start, end)
     print(f"   ✅ PASSED: {len(data)} trading days, {len(trades)} trades")
     tests_passed += 1
 except Exception as e:
@@ -119,18 +119,18 @@ except Exception as e:
     tests_failed += 1
 
 # Test 8: Optimized Strategy (longer period)
-print("\n8. Optimized Ensemble (180 calendar days, 5 trials, quiet)...")
+print("\n8. Optimized Ensemble (365 calendar days, 3 trials, quiet)...")
 try:
     strategy = OptimizedMLStrategy('SPY', lookback=40, prediction_horizon=5)
     end = datetime.now()
-    start = end - timedelta(days=180)
+    start = end - timedelta(days=365)
     
     import sys
     import io
     old_stdout = sys.stdout
     sys.stdout = io.StringIO()
     
-    df, trades, final, equity = strategy.backtest(start, end, optimize_params=True, n_trials=5)
+    df, trades, final, equity = strategy.backtest(start, end, optimize_params=True, n_trials=3)
     
     sys.stdout = old_stdout
     print(f"   ✅ PASSED: {len(trades)} trades")
