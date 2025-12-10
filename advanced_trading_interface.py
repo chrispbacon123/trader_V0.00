@@ -185,57 +185,31 @@ class AdvancedTradingInterface:
     
     def print_main_menu(self):
         print("═" * 90)
-        print("MAIN MENU")
+        print("QUANTITATIVE TRADING PLATFORM - MAIN MENU")
         print("═" * 90)
         print()
-        print("📊 STRATEGY OPERATIONS")
-        print("  1. Run Strategy on Single Asset")
-        print("  2. Compare All Strategies (Single Asset)")
-        print("  3. Batch Test Strategies (Multiple Assets)")
-        print("  4. Sector/Industry Analysis")
+        print("📊 CORE STRATEGY OPERATIONS")
+        print("  1. Run Single Strategy Backtest")
+        print("  2. Run Portfolio Backtest")
+        print("  3. Compare Multiple Strategies")
+        print("  4. Technical Analysis Dashboard")
         print()
-        print("💼 PORTFOLIO MANAGEMENT")
-        print("  5. Create New Portfolio")
-        print("  6. View All Portfolios")
-        print("  7. Run Portfolio Backtest")
-        print("  8. Compare Portfolios")
-        print("  9. Edit Portfolio")
-        print(" 10. Delete Portfolio")
+        print("🔨 STRATEGY DEVELOPMENT")
+        print("  5. Create Custom Strategy")
+        print("  6. Optimize Strategy Parameters")
+        print("  7. Market Analytics & Screening")
         print()
-        print("📈 ANALYSIS & TOOLS")
-        print(" 11. Technical Analysis Dashboard")
-        print(" 12. View All Results History")
-        print(" 13. Filter Results (by symbol, strategy, date)")
-        print(" 14. Export Results to CSV")
-        print(" 15. Market Analytics & Regime Detection")
-        print(" 16. Correlation Analysis")
+        print("💾 MANAGEMENT")
+        print("  8. Manage Saved Portfolios")
+        print("  9. Manage Saved Strategies")
+        print(" 10. Advanced Settings")
         print()
-        print("💾 STRATEGY LIBRARY")
-        print(" 17. Save Current Strategy Configuration")
-        print(" 18. Load & Run Saved Strategy")
-        print(" 19. View All Saved Strategies")
-        print(" 20. Clone/Modify Strategy")
-        print(" 21. Export/Import Strategies")
-        print(" 22. Strategy Performance Leaderboard")
-        print()
-        print("⚙️  SETTINGS")
-        print(" 23. Set Default Capital & Target Returns")
-        print(" 24. Manage Watchlists")
-        print()
-        print("🔧 OPTIMIZATION & ADVANCED")
-        print(" 25. Optimize Strategy Parameters")
-        print(" 26. Advanced Settings Manager")
-        print(" 27. Risk Analysis Dashboard")
-        print(" 28. Walk-Forward Analysis")
-        print(" 29. Monte Carlo Simulation")
-        print()
-        print("🔨 CUSTOM STRATEGY BUILDER")
-        print(" 30. Create Custom Strategy (Interactive)")
-        print(" 31. Export Strategy for Live Trading")
-        print(" 32. Load & Test Custom Strategy")
+        print("🚀 DEPLOYMENT & REPORTING")
+        print(" 11. Export Strategy for Live Trading")
+        print(" 12. View Performance Reports")
+        print(" 13. Help & Documentation")
         print()
         print("  0. Exit")
-        print("  ?. Help & Usage Guide")
         print("═" * 90)
         print()
     
@@ -2933,6 +2907,111 @@ class AdvancedTradingInterface:
         
         input("\nPress Enter to continue...")
     
+    def manage_portfolios_menu(self):
+        """Portfolio management submenu"""
+        while True:
+            print("\n" + "═" * 60)
+            print("PORTFOLIO MANAGEMENT")
+            print("═" * 60)
+            print("  1. Create New Portfolio")
+            print("  2. View All Portfolios")
+            print("  3. Compare Portfolios")
+            print("  4. Edit Portfolio")
+            print("  5. Delete Portfolio")
+            print("  0. Back to Main Menu")
+            print("═" * 60)
+            
+            choice = input("\nEnter choice: ").strip()
+            
+            if choice == '0':
+                break
+            elif choice == '1':
+                self.create_portfolio()
+            elif choice == '2':
+                self.view_portfolios()
+            elif choice == '3':
+                self.compare_portfolios()
+            elif choice == '4':
+                self.edit_portfolio()
+            elif choice == '5':
+                self.delete_portfolio()
+            else:
+                print("❌ Invalid choice!")
+            
+            if choice != '0':
+                input("\nPress Enter to continue...")
+    
+    def manage_strategies_menu(self):
+        """Strategy management submenu"""
+        while True:
+            print("\n" + "═" * 60)
+            print("STRATEGY MANAGEMENT")
+            print("═" * 60)
+            print("  1. Save Current Strategy Configuration")
+            print("  2. Load & Run Saved Strategy")
+            print("  3. View All Saved Strategies")
+            print("  4. Clone/Modify Strategy")
+            print("  5. Export/Import Strategies")
+            print("  6. Strategy Performance Leaderboard")
+            print("  0. Back to Main Menu")
+            print("═" * 60)
+            
+            choice = input("\nEnter choice: ").strip()
+            
+            if choice == '0':
+                break
+            elif choice == '1':
+                self.save_strategy_config()
+            elif choice == '2':
+                self.load_and_run_strategy()
+            elif choice == '3':
+                self.view_saved_strategies()
+            elif choice == '4':
+                self.clone_modify_strategy()
+            elif choice == '5':
+                self.export_import_strategies()
+            elif choice == '6':
+                self.strategy_leaderboard()
+            else:
+                print("❌ Invalid choice!")
+            
+            if choice != '0':
+                input("\nPress Enter to continue...")
+    
+    def view_performance_reports(self):
+        """View performance reports submenu"""
+        while True:
+            print("\n" + "═" * 60)
+            print("PERFORMANCE REPORTS")
+            print("═" * 60)
+            print("  1. View All Results History")
+            print("  2. Filter Results (by symbol, strategy, date)")
+            print("  3. Export Results to CSV")
+            print("  4. Risk Analysis Dashboard")
+            print("  5. Correlation Analysis")
+            print("  0. Back to Main Menu")
+            print("═" * 60)
+            
+            choice = input("\nEnter choice: ").strip()
+            
+            if choice == '0':
+                break
+            elif choice == '1':
+                self.view_history()
+            elif choice == '2':
+                self.filter_results()
+            elif choice == '3':
+                self.export_results()
+            elif choice == '4':
+                self.risk_analysis_dashboard()
+            elif choice == '5':
+                self.correlation_analysis_menu()
+            else:
+                print("❌ Invalid choice!")
+            
+            if choice != '0':
+                input("\nPress Enter to continue...")
+    
     def run(self):
         """Main interface loop"""
         while True:
@@ -2944,102 +3023,45 @@ class AdvancedTradingInterface:
             if choice == '0':
                 print("\n👋 Exiting... Happy trading! 🚀\n")
                 break
-            elif choice == '?' or choice.lower() == 'help':
-                self.show_help()
-                input("\n\nPress Enter to continue...")
             elif choice == '1':
                 self.run_single_strategy()
                 input("\n\nPress Enter to continue...")
             elif choice == '2':
-                self.compare_all_strategies()
-                input("\n\nPress Enter to continue...")
-            elif choice == '3':
-                self.batch_test_strategies()
-                input("\n\nPress Enter to continue...")
-            elif choice == '4':
-                self.sector_analysis()
-                input("\n\nPress Enter to continue...")
-            elif choice == '5':
-                self.create_portfolio()
-                input("\n\nPress Enter to continue...")
-            elif choice == '6':
-                self.view_portfolios()
-                input("\n\nPress Enter to continue...")
-            elif choice == '7':
                 self.run_portfolio_backtest()
                 input("\n\nPress Enter to continue...")
-            elif choice == '8':
-                self.compare_portfolios()
+            elif choice == '3':
+                self.compare_all_strategies()
                 input("\n\nPress Enter to continue...")
-            elif choice == '9':
-                self.edit_portfolio()
-                input("\n\nPress Enter to continue...")
-            elif choice == '10':
-                self.delete_portfolio()
-                input("\n\nPress Enter to continue...")
-            elif choice == '11':
+            elif choice == '4':
                 self.technical_analysis_dashboard()
                 input("\n\nPress Enter to continue...")
-            elif choice == '12':
-                self.view_history()
+            elif choice == '5':
+                self.create_custom_strategy()
                 input("\n\nPress Enter to continue...")
-            elif choice == '13':
-                self.filter_results()
-                input("\n\nPress Enter to continue...")
-            elif choice == '14':
-                self.export_results()
-                input("\n\nPress Enter to continue...")
-            elif choice == '15':
-                self.market_analytics_menu()
-                input("\n\nPress Enter to continue...")
-            elif choice == '16':
-                self.correlation_analysis_menu()
-                input("\n\nPress Enter to continue...")
-            elif choice == '17':
-                self.save_strategy_config()
-                input("\n\nPress Enter to continue...")
-            elif choice == '18':
-                self.load_and_run_strategy()
-                input("\n\nPress Enter to continue...")
-            elif choice == '19':
-                self.view_saved_strategies()
-                input("\n\nPress Enter to continue...")
-            elif choice == '20':
-                self.clone_modify_strategy()
-                input("\n\nPress Enter to continue...")
-            elif choice == '21':
-                self.export_import_strategies()
-                input("\n\nPress Enter to continue...")
-            elif choice == '22':
-                self.strategy_leaderboard()
-                input("\n\nPress Enter to continue...")
-            elif choice == '23':
-                self.manage_settings()
-                input("\n\nPress Enter to continue...")
-            elif choice == '24':
-                self.manage_watchlists()
-                input("\n\nPress Enter to continue...")
-            elif choice == '25':
+            elif choice == '6':
                 self.optimize_strategy_menu()
                 input("\n\nPress Enter to continue...")
-            elif choice == '26':
+            elif choice == '7':
+                self.market_analytics_menu()
+                input("\n\nPress Enter to continue...")
+            elif choice == '8':
+                self.manage_portfolios_menu()
+                input("\n\nPress Enter to continue...")
+            elif choice == '9':
+                self.manage_strategies_menu()
+                input("\n\nPress Enter to continue...")
+            elif choice == '10':
                 self.advanced_settings_menu()
                 input("\n\nPress Enter to continue...")
-            elif choice == '27':
-                self.risk_analysis_dashboard()
-                input("\n\nPress Enter to continue...")
-            elif choice == '28':
-                print("\n⚠️  Walk-Forward Analysis - Coming in next update!")
-                input("\nPress Enter to continue...")
-            elif choice == '29':
-                print("\n⚠️  Monte Carlo Simulation - Coming in next update!")
-                input("\nPress Enter to continue...")
-            elif choice == '30':
-                self.create_custom_strategy()
-            elif choice == '31':
+            elif choice == '11':
                 self.export_strategy_for_live()
-            elif choice == '32':
-                self.load_and_test_custom_strategy()
+                input("\n\nPress Enter to continue...")
+            elif choice == '12':
+                self.view_performance_reports()
+                input("\n\nPress Enter to continue...")
+            elif choice == '13':
+                self.show_help()
+                input("\n\nPress Enter to continue...")
             else:
                 print("\n❌ Invalid choice!")
                 input("\nPress Enter to continue...")
