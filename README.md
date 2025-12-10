@@ -1,167 +1,86 @@
-# 📈 Advanced Trading Platform
+# Advanced Quantitative Trading Platform 🚀
 
-A comprehensive algorithmic trading platform with ML-powered strategies, portfolio management, and custom strategy builder.
+Professional-grade algorithmic trading platform with ML-powered strategies, advanced analytics, and comprehensive risk management.
 
-## ✨ Features
-
-- **4 Built-in Strategies**: Simple, ML, Optimized ML, Short-term
-- **Custom Strategy Builder**: Create and export your own strategies
-- **Portfolio Management**: Multi-strategy allocation
-- **Technical Analysis**: Real-time charts and indicators
-- **Live Trading Export**: Python, JSON, QuantConnect LEAN
-
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
-cd ~/lean-trading
 python3 advanced_trading_interface.py
 ```
 
-Or:
-```bash
-./run.sh
-```
+## Features
 
-## 📖 Documentation
+### 📊 Core Operations
+- Single & Portfolio Strategy Backtesting
+- Multi-Strategy Comparison
+- Technical Analysis Dashboard
 
-See [QUICKSTART.md](QUICKSTART.md) for detailed guide.
+### 🔨 Strategy Development
+- Custom Strategy Builder
+- Parameter Optimization
+- Market Screening & Analytics
 
-## 🎯 Main Features
+### 📈 Advanced Analytics
+- **Monte Carlo Simulation** - Probabilistic risk modeling
+- **Walk-Forward Analysis** - Out-of-sample validation
+- **Advanced Risk Metrics** - VaR, CVaR, Calmar, Omega, Ulcer Index
 
-### Strategy Testing
-1. Single asset testing
-2. Compare all strategies
-3. Batch test multiple assets
-4. Sector analysis
-
-### Portfolio Management
-5-10. Create, view, test, compare portfolios
-
-### Custom Strategy Builder (NEW!)
-30. **Create Custom** - Interactive designer
-31. **Export for Live** - Python/JSON/LEAN formats
-32. **Load & Test** - Review strategies
-
-### Analysis Tools
-- Technical analysis
-- Market analytics
+### 🛡️ Risk Management
+- Position sizing algorithms
+- Drawdown controls
+- Volatility adjustment
 - Correlation analysis
-- Parameter optimization
-- Risk analysis
 
-## 📊 Built-in Strategies
+## Installation
 
-| Strategy | Best For | Min Days |
-|----------|----------|----------|
-| Simple Mean Reversion | Ranging markets | 20 |
-| ML Trading | Trending markets | 60 |
-| Optimized ML | High volatility | 90 |
-| Short-term | Day trading | 15 |
-
-## 💡 Quick Examples
-
-### Test a Strategy
-```
-Option: 1
-Symbol: SPY
-Days: 365
-Strategy: 1 (Simple)
+```bash
+git clone https://github.com/chrispbacon123/trader_V0.00.git
+cd trader_V0.00
+pip install -r requirements.txt
+python3 advanced_trading_interface.py
 ```
 
-### Create Custom Strategy
-```
-Option: 30
-Name: My Strategy
-Indicators: RSI, MACD, Volume
-Entry Rules: Define conditions
-Exit Rules: Define exits
-Risk: Set parameters
-Export: Option 31
-```
+## Supported Assets
+- Stocks (NYSE, NASDAQ)
+- ETFs
+- Cryptocurrencies (BTC-USD, ETH-USD, etc.)
+- Forex pairs
+- Indices (SPY, QQQ, DIA)
 
-### Build Portfolio
-```
-Option: 5
-Name: Tech Portfolio
-Capital: 100000
-Allocation: Simple 25%, ML 40%, Optimized 35%
-Assets: AAPL, MSFT, GOOGL
-```
+## Built-in Strategies
+- Simple Mean Reversion
+- ML Trading (Random Forest)
+- Optimized ML
+- Short Term Mean Reversion
 
-## 🛠️ Technology
+## Advanced Risk Metrics
+- Value at Risk (Historical, Parametric, Cornish-Fisher)
+- Conditional VaR (Expected Shortfall)
+- Maximum Drawdown & Duration
+- Sharpe, Sortino, Calmar Ratios
+- Omega Ratio, Ulcer Index
+- Tail Ratio, Gain/Pain Ratio
 
-- Python 3.8+
-- yfinance (data)
-- scikit-learn, xgboost (ML)
-- pandas, numpy (analysis)
-
-## 📦 Project Structure
-
-```
-lean-trading/
-├── advanced_trading_interface.py  # Main app
-├── strategy_builder.py            # Custom builder
-├── [strategy files]               # Built-in strategies
-├── custom_strategies/             # Your strategies
-├── strategy_exports/              # Exported code
-├── README.md                      # This file
-├── QUICKSTART.md                  # Detailed guide
-└── run.sh                         # Quick launcher
-```
-
-## ⚠️ Important
-
-**Educational use only**
+## Educational Use Only ⚠️
+- Past performance ≠ future results
+- For research and learning
 - Not financial advice
 - Test thoroughly before live trading
-- Paper trade first
-- Risk only what you can afford to lose
 
-## 📈 Performance Metrics
+## Quick Example
 
-All backtests show:
-- Total Return
-- Sharpe Ratio
-- Max Drawdown
-- Win Rate
-- Profit Factor
-- Trade Count
+1. Run: `python3 advanced_trading_interface.py`
+2. Choose option `1` (Run Single Strategy)
+3. Enter symbol: `SPY`
+4. Select strategy: `1` (Mean Reversion)
+5. Use default dates (press Enter)
+6. View results!
 
-## 🚨 Known Limitations
+## Support
 
-1. Daily data only (no intraday)
-2. ML strategies need 60+ days data
-3. Simplified transaction costs
-4. Custom strategies need manual implementation
-
-## 🔜 Coming Soon
-
-- Walk-forward analysis
-- Monte Carlo simulation
-- Intraday data
-- More ML models
-- Live trading integration
-
-## 📄 License
-
-MIT License - Personal use
-
-## 🙏 Built With
-
-- yfinance - Market data
-- scikit-learn - Machine learning
-- QuantConnect - LEAN framework
+- GitHub Issues
+- In-app help (option `16`)
 
 ---
 
-**Quick Links:**
-- 📖 [Detailed Guide](QUICKSTART.md)
-- 🚀 [Start Now](#quick-start)
-- 🎓 [Examples](#quick-examples)
-
-**Ready? Run:**
-```bash
-cd ~/lean-trading && ./run.sh
-```
-
-*Version 2.0*
+**Always validate strategies thoroughly before deploying real capital.**
