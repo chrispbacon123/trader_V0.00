@@ -1,5 +1,8 @@
 # Advanced Quantitative Trading Platform 🚀
 
+**Copyright © 2024-2025 chrispbacon123. All Rights Reserved.**  
+**Proprietary Software - Personal/Home Use Only**
+
 > **🎉 V0.20 RELEASE** ✅  
 > Production-ready platform with comprehensive testing and documentation.
 > 
@@ -178,6 +181,17 @@ pip install --user pandas numpy scikit-learn yfinance matplotlib seaborn plotly 
 - Sharpe, Sortino, Calmar Ratios
 - Omega Ratio, Ulcer Index
 - Tail Ratio, Gain/Pain Ratio
+
+## License
+
+This software is proprietary and for personal, non-commercial, home use only. See [LICENSE](LICENSE) for full terms.
+
+**Key Restrictions:**
+- ✅ Personal/home use only
+- ❌ No commercial use
+- ❌ No redistribution
+- ❌ No modification or derivative works
+- ❌ No live trading or production use
 
 ## Educational Use Only ⚠️
 - Past performance ≠ future results
