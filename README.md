@@ -1,37 +1,44 @@
 # Advanced Quantitative Trading Platform 🚀
 
-> **🎉 V0.14 PRODUCTION HARDENING COMPLETE** ✅  
-> Platform consolidation, robustness, and optimization reliability complete.
+> **🎉 V0.20 RELEASE** ✅  
+> Production-ready platform with comprehensive testing and documentation.
 > 
 > **📚 START HERE:**
 > - **Quick overview:** Read this README
-> - **Run tests:** `pytest` (from any directory in repo)
-> - **Smoke test:** `python scripts/smoke_platform.py` (offline, no dependencies)
+> - **Complete guide:** See [USER_GUIDE.md](USER_GUIDE.md)
+> - **Setup instructions:** See [SETUP.md](SETUP.md)
+> - **Run tests:** `pytest` (from any directory in repo) - See [TESTING.md](TESTING.md)
 > - **Run UI:** `python advanced_trading_interface.py`
 
 Professional-grade algorithmic trading platform with ML-powered strategies, advanced analytics, and comprehensive risk management.
 
 ---
 
-## 🆕 What's New - V0.14 (December 2024)
+## 🆕 What's New - V0.20 (December 2024)
 
-### V0.14 Production Hardening ✅
+### V0.20 Documentation & Consolidation ✅
+- **Consolidated Documentation:** All guides unified into clear, sectioned documents
+- **Updated References:** All documentation updated to V0.20
+- **Simplified Structure:** Reduced from 90+ docs to 6 core documents
+- **Clear Navigation:** Easy-to-follow guides for all user levels
+
+### Core Documentation
+1. **[README.md](README.md)** - This file: Quick overview and getting started
+2. **[USER_GUIDE.md](USER_GUIDE.md)** - Complete user guide with workflows and examples
+3. **[SETUP.md](SETUP.md)** - Installation and configuration instructions
+4. **[TESTING.md](TESTING.md)** - Testing guide and validation procedures
+5. **[CHANGELOG.md](CHANGELOG.md)** - Version history and updates
+6. **[DEVELOPMENT.md](DEVELOPMENT.md)** - Technical details for developers
+
+### Platform Features (Inherited from V0.14)
 - **Version Consolidation:** Single canonical version in `core_config.PLATFORM_VERSION`
 - **Smoke Test Runner:** `scripts/smoke_platform.py` runs offline with fixtures
-- **Test Cleanup:** Root-level test files renamed to `smoke_*.py` to avoid pytest confusion
 - **Integration Tests:** 75+ tests covering all core functionality
 - **Schema Stability:** All API responses have guaranteed keys (no KeyError crashes)
 - **Optional Dependencies:** yfinance/optuna lazy-loaded, UI works without them
 
-### Key Improvements
-1. **Centralized Versioning:** `core_config.PLATFORM_VERSION` is the single source of truth
-2. **Smoke Test:** `python scripts/smoke_platform.py` validates full pipeline offline
-3. **Robust Schemas:** `result_schemas.py` provides typed result objects
-4. **Persistence Safety:** `persistence.py` normalizes old records, no KeyError
-5. **Optimizer Stability:** Always returns `best_params={}` (never None), failure summary
-
 ### Run Commands
-```powershell
+```bash
 # Run tests (from repo root)
 pytest
 
@@ -46,7 +53,13 @@ python advanced_trading_interface.py
 
 ## 🔄 Version History
 
-### V0.14 (Current) - Production Hardening
+### V0.20 (Current) - Documentation Consolidation
+- Unified documentation structure
+- Clear sectioned guides
+- Updated to current version
+- Removed outdated status files
+
+### V0.14 - Production Hardening
 - Centralized versioning
 - Smoke test runner
 - Schema stability guarantees

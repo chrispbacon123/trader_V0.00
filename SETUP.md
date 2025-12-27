@@ -1,4 +1,11 @@
-# Complete Setup Guide
+# Setup Guide
+
+**Version:** V0.20  
+**Last Updated:** December 2024
+
+---
+
+---
 
 ## Prerequisites
 
