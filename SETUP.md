@@ -1,7 +1,10 @@
 # Setup Guide
 
 **Version:** V0.20  
-**Last Updated:** December 2024
+**Last Updated:** December 2024  
+**Copyright © 2024-2025 chrispbacon123. All Rights Reserved.**
+
+> ⚠️ **PROPRIETARY SOFTWARE** - Personal/home use only. See [LICENSE](LICENSE).
 
 ---
 

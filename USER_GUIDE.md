@@ -1,7 +1,11 @@
 # Advanced Quantitative Trading Platform - User Guide
 
 **Version:** V0.20  
-**Last Updated:** December 2024
+**Last Updated:** December 2024  
+**Copyright © 2024-2025 chrispbacon123. All Rights Reserved.**
+
+> ⚠️ **PROPRIETARY SOFTWARE** - This software is for personal, non-commercial, home use only.  
+> See [LICENSE](LICENSE) for full terms and restrictions.
 
 ---
 
