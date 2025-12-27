@@ -9,6 +9,7 @@ from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
 from enum import Enum
 import json
+from core_config import PORTFOLIO_CFG
 
 class OrderType(Enum):
     MARKET = "MARKET"
@@ -34,20 +35,20 @@ class OrderStatus(Enum):
 class Order:
     """Order object with full details"""
     
-    def __init__(self, symbol: str, side: OrderSide, quantity: int, 
+    def __init__(self, symbol: str, side: OrderSide, quantity: float, 
                  order_type: OrderType, price: Optional[float] = None,
                  stop_price: Optional[float] = None, time_in_force: str = "GTC",
                  metadata: Dict = None):
         self.id = f"ORD_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
         self.symbol = symbol
         self.side = side
-        self.quantity = quantity
+        self.quantity = quantity  # float to support fractional shares
         self.order_type = order_type
         self.price = price
         self.stop_price = stop_price
         self.time_in_force = time_in_force  # GTC, DAY, IOC, FOK
         self.status = OrderStatus.PENDING
-        self.filled_quantity = 0
+        self.filled_quantity = 0.0  # float to support fractional fills
         self.avg_fill_price = 0.0
         self.created_at = datetime.now()
         self.updated_at = datetime.now()
@@ -95,20 +96,37 @@ class TWAPAlgorithm(ExecutionAlgorithm):
         
     def generate_child_orders(self, market_data: pd.DataFrame) -> List[Order]:
         """Split order into equal time slices"""
-        slice_size = self.order.quantity // self.num_slices
-        remainder = self.order.quantity % self.num_slices
-        
-        child_orders = []
-        for i in range(self.num_slices):
-            quantity = slice_size + (1 if i < remainder else 0)
-            child_order = Order(
-                symbol=self.order.symbol,
-                side=self.order.side,
-                quantity=quantity,
-                order_type=OrderType.MARKET,
-                metadata={'parent_id': self.order.id, 'slice': i}
-            )
-            child_orders.append(child_order)
+        # Handle fractional vs whole shares
+        if PORTFOLIO_CFG.FRACTIONAL_SHARES_ALLOWED:
+            # Fractional mode: split evenly as floats
+            slice_size = self.order.quantity / self.num_slices
+            child_orders = []
+            
+            for i in range(self.num_slices):
+                child_order = Order(
+                    symbol=self.order.symbol,
+                    side=self.order.side,
+                    quantity=slice_size,
+                    order_type=OrderType.MARKET,
+                    metadata={'parent_id': self.order.id, 'slice': i}
+                )
+                child_orders.append(child_order)
+        else:
+            # Integer mode: distribute remainder across first slices
+            slice_size = int(self.order.quantity) // self.num_slices
+            remainder = int(self.order.quantity) % self.num_slices
+            
+            child_orders = []
+            for i in range(self.num_slices):
+                quantity = slice_size + (1 if i < remainder else 0)
+                child_order = Order(
+                    symbol=self.order.symbol,
+                    side=self.order.side,
+                    quantity=quantity,
+                    order_type=OrderType.MARKET,
+                    metadata={'parent_id': self.order.id, 'slice': i}
+                )
+                child_orders.append(child_order)
         
         return child_orders
 
@@ -131,7 +149,10 @@ class VWAPAlgorithm(ExecutionAlgorithm):
         for i, pct in enumerate(volume_pcts):
             if remaining <= 0:
                 break
-            quantity = int(self.order.quantity * pct)
+            quantity = self.order.quantity * pct
+            # Apply fractional logic
+            if not PORTFOLIO_CFG.FRACTIONAL_SHARES_ALLOWED:
+                quantity = int(quantity)
             quantity = min(quantity, remaining)
             
             if quantity > 0:
@@ -150,19 +171,44 @@ class VWAPAlgorithm(ExecutionAlgorithm):
 class IcebergOrder(ExecutionAlgorithm):
     """Iceberg order - only show small portion of total order"""
     
-    def __init__(self, order: Order, visible_quantity: int):
+    def __init__(self, order: Order, visible_quantity: float):
+        """
+        Initialize Iceberg order
+        
+        Args:
+            order: Parent order
+            visible_quantity: Visible quantity per slice (can be fractional)
+        """
         super().__init__(order)
         self.visible_quantity = visible_quantity
         
     def generate_child_orders(self, market_data: pd.DataFrame) -> List[Order]:
         """Generate child orders with limited visibility"""
-        num_slices = (self.order.quantity + self.visible_quantity - 1) // self.visible_quantity
+        # Check if fractional shares allowed
+        if not PORTFOLIO_CFG.FRACTIONAL_SHARES_ALLOWED:
+            # Iceberg requires whole shares in integer mode
+            if self.order.quantity != int(self.order.quantity) or \
+               self.visible_quantity != int(self.visible_quantity):
+                raise ValueError(
+                    "IcebergOrder requires whole shares when FRACTIONAL_SHARES_ALLOWED=False. "
+                    f"Got order qty={self.order.quantity}, visible_qty={self.visible_quantity}"
+                )
+        
+        # Calculate number of slices
+        if PORTFOLIO_CFG.FRACTIONAL_SHARES_ALLOWED:
+            # Fractional mode: use ceil to ensure we cover full quantity
+            import math
+            num_slices = math.ceil(self.order.quantity / self.visible_quantity)
+        else:
+            # Integer mode
+            num_slices = (int(self.order.quantity) + int(self.visible_quantity) - 1) // int(self.visible_quantity)
         
         child_orders = []
         remaining = self.order.quantity
         
         for i in range(num_slices):
             quantity = min(self.visible_quantity, remaining)
+            
             child_order = Order(
                 symbol=self.order.symbol,
                 side=self.order.side,
@@ -173,6 +219,9 @@ class IcebergOrder(ExecutionAlgorithm):
             )
             child_orders.append(child_order)
             remaining -= quantity
+            
+            if remaining <= 0:
+                break
         
         return child_orders
 

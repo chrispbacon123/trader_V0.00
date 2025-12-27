@@ -253,37 +253,60 @@ class PatternRecognition:
     @staticmethod
     def find_support_resistance(df: pd.DataFrame, window=20, threshold=0.02) -> Dict:
         """Identify support and resistance levels"""
+        # Use only recent 100 periods to avoid mixing old price ranges
+        lookback = min(100, len(df))
+        recent_df = df.iloc[-lookback:].copy()
+        
         # Find local maxima and minima
-        highs = df['high'].values
-        lows = df['low'].values
+        highs = recent_df['high'].values
+        lows = recent_df['low'].values
+        
+        # Need enough data for the window
+        if len(recent_df) < window * 2:
+            current_price = recent_df['close'].iloc[-1]
+            return {
+                'resistance': [recent_df['high'].max()],
+                'support': [recent_df['low'].min()]
+            }
         
         resistance_idx = argrelextrema(highs, np.greater, order=window)[0]
         support_idx = argrelextrema(lows, np.less, order=window)[0]
         
         resistance_levels = []
         support_levels = []
+        current_price = recent_df['close'].iloc[-1]
         
-        # Cluster nearby levels
+        # Cluster nearby levels and filter by proximity to current price
         for idx in resistance_idx:
             level = highs[idx]
-            # Check if similar level exists
-            similar = False
-            for existing in resistance_levels:
-                if abs(level - existing) / existing < threshold:
-                    similar = True
-                    break
-            if not similar:
-                resistance_levels.append(level)
+            # Only include levels within 20% of current price
+            if level < current_price * 1.2:
+                # Check if similar level exists
+                similar = False
+                for existing in resistance_levels:
+                    if abs(level - existing) / existing < threshold:
+                        similar = True
+                        break
+                if not similar:
+                    resistance_levels.append(level)
         
         for idx in support_idx:
             level = lows[idx]
-            similar = False
-            for existing in support_levels:
-                if abs(level - existing) / existing < threshold:
-                    similar = True
-                    break
-            if not similar:
-                support_levels.append(level)
+            # Only include levels within 20% of current price
+            if level > current_price * 0.8:
+                similar = False
+                for existing in support_levels:
+                    if abs(level - existing) / existing < threshold:
+                        similar = True
+                        break
+                if not similar:
+                    support_levels.append(level)
+        
+        # Fallback if no levels found
+        if not resistance_levels:
+            resistance_levels = [recent_df['high'].iloc[-20:].max()]
+        if not support_levels:
+            support_levels = [recent_df['low'].iloc[-20:].min()]
         
         return {
             'resistance': sorted(resistance_levels, reverse=True)[:5],

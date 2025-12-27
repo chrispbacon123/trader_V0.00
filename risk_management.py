@@ -8,6 +8,7 @@ import pandas as pd
 from typing import Dict, List, Tuple, Optional
 from datetime import datetime, timedelta
 import json
+from core_config import PORTFOLIO_CFG
 
 class RiskManager:
     """Comprehensive risk management for trading strategies"""
@@ -22,15 +23,23 @@ class RiskManager:
         self.take_profit_pct = self.config.get('take_profit_pct', 0.15)  # 15% take profit
         
     def calculate_position_size(self, capital: float, price: float, 
-                               volatility: float, risk_per_trade: float = 0.02) -> int:
-        """Calculate optimal position size using volatility-adjusted Kelly criterion"""
+                               volatility: float, risk_per_trade: float = 0.02) -> float:
+        """Calculate optimal position size using volatility-adjusted Kelly criterion
+        
+        Returns:
+            float: Number of shares (float if fractional enabled, int otherwise)
+        """
         # Kelly fraction adjusted for risk
         kelly_fraction = risk_per_trade / (volatility ** 2) if volatility > 0 else 0.01
         kelly_fraction = min(kelly_fraction, self.max_position_size)
         
         # Position size in shares
         position_value = capital * kelly_fraction
-        shares = int(position_value / price)
+        shares = position_value / price
+        
+        # Apply fractional share logic
+        if not PORTFOLIO_CFG.FRACTIONAL_SHARES_ALLOWED:
+            shares = int(shares)
         
         return max(shares, 0)
     
@@ -156,34 +165,59 @@ class PositionSizer:
     """Advanced position sizing strategies"""
     
     @staticmethod
-    def fixed_fractional(capital: float, price: float, risk_pct: float = 0.02) -> int:
-        """Fixed fractional position sizing"""
+    def fixed_fractional(capital: float, price: float, risk_pct: float = 0.02) -> float:
+        """Fixed fractional position sizing
+        
+        Returns:
+            float: Number of shares (float if fractional enabled, int otherwise)
+        """
         position_value = capital * risk_pct
-        return int(position_value / price)
+        shares = position_value / price
+        if not PORTFOLIO_CFG.FRACTIONAL_SHARES_ALLOWED:
+            shares = int(shares)
+        return shares
     
     @staticmethod
     def volatility_adjusted(capital: float, price: float, volatility: float, 
-                           target_risk: float = 0.02) -> int:
-        """Position size adjusted for volatility"""
+                           target_risk: float = 0.02) -> float:
+        """Position size adjusted for volatility
+        
+        Returns:
+            float: Number of shares (float if fractional enabled, int otherwise)
+        """
         if volatility == 0:
             return 0
         position_value = capital * (target_risk / volatility)
-        return int(position_value / price)
+        shares = position_value / price
+        if not PORTFOLIO_CFG.FRACTIONAL_SHARES_ALLOWED:
+            shares = int(shares)
+        return shares
     
     @staticmethod
     def kelly_criterion(capital: float, price: float, win_rate: float, 
-                       avg_win: float, avg_loss: float) -> int:
-        """Kelly criterion position sizing"""
+                       avg_win: float, avg_loss: float) -> float:
+        """Kelly criterion position sizing
+        
+        Returns:
+            float: Number of shares (float if fractional enabled, int otherwise)
+        """
         if avg_loss == 0:
             return 0
         kelly = (win_rate * avg_win - (1 - win_rate) * avg_loss) / avg_loss
         kelly = max(0, min(kelly, 0.25))  # Cap at 25%
         position_value = capital * kelly
-        return int(position_value / price)
+        shares = position_value / price
+        if not PORTFOLIO_CFG.FRACTIONAL_SHARES_ALLOWED:
+            shares = int(shares)
+        return shares
     
     @staticmethod
-    def optimal_f(capital: float, price: float, trade_history: List[float]) -> int:
-        """Optimal f position sizing"""
+    def optimal_f(capital: float, price: float, trade_history: List[float]) -> float:
+        """Optimal f position sizing
+        
+        Returns:
+            float: Number of shares (float if fractional enabled, int otherwise)
+        """
         if not trade_history:
             return 0
         
@@ -203,7 +237,10 @@ class PositionSizer:
                 best_f = f
         
         position_value = capital * best_f
-        return int(position_value / price)
+        shares = position_value / price
+        if not PORTFOLIO_CFG.FRACTIONAL_SHARES_ALLOWED:
+            shares = int(shares)
+        return shares
 
 
 class PortfolioAnalyzer:

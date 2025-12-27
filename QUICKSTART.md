@@ -2,6 +2,13 @@
 
 ## 🎯 How to Start
 
+### Windows
+```powershell
+cd trader_V0.00
+python advanced_trading_interface.py
+```
+
+### Mac/Linux
 ```bash
 cd ~/lean-trading
 python3 advanced_trading_interface.py
@@ -147,3 +154,25 @@ python3 advanced_trading_interface.py
 **Type `?` or `help` for in-app help menu**
 
 Happy Trading! 📈
+
+---
+
+## 🔧 Recent Updates (December 2024)
+
+### Data Integrity Fixes ✅
+Fixed critical issues in support/resistance and pattern recognition:
+- Limited analysis to recent 100 days (prevents old data contamination)
+- Added 20% price proximity filter to current price
+- Enhanced symbol isolation (no cross-contamination)
+- Created test suite: `python test_data_integrity.py`
+
+**Impact:** More accurate market analytics for better trading decisions
+
+### New Dependencies
+- `xgboost` - Gradient boosting for ML strategies
+- `optuna` - Hyperparameter optimization
+
+### Installation Updated
+Windows installation now documented in README.md and APP_INFO.md
+
+**See CHANGELOG.md for complete version history**

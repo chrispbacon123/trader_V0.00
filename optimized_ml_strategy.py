@@ -1,19 +1,58 @@
 """
 Optimized ML Trading Strategy with Hyperparameter Tuning
 Uses Optuna for automatic optimization and ensemble models
+Uses canonical data and centralized sizing
 """
 
-import yfinance as yf
 import pandas as pd
+
+# Lazy import yfinance - optional dependency
+yf = None
+
+def _ensure_yfinance():
+    """Lazy load yfinance when needed"""
+    global yf
+    if yf is None:
+        try:
+            import yfinance as yf_module
+            yf = yf_module
+        except ImportError:
+            raise ImportError(
+                "yfinance is required for data download. "
+                "Install with: pip install yfinance"
+            )
+    return yf
+
 import numpy as np
 from datetime import datetime, timedelta
 import xgboost as xgb
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import accuracy_score, precision_score
-import optuna
 import warnings
 warnings.filterwarnings('ignore')
+
+# Lazy import optuna - optional dependency
+optuna = None
+
+def _ensure_optuna():
+    """Lazy load optuna when needed for hyperparameter optimization"""
+    global optuna
+    if optuna is None:
+        try:
+            import optuna as optuna_module
+            optuna = optuna_module
+        except ImportError:
+            raise ImportError(
+                "Optuna is required for hyperparameter optimization. "
+                "Install with: pip install optuna\n"
+                "Or use the strategy without optimization."
+            )
+    return optuna
+
+from canonical_data import CanonicalDataFetcher
+from sizing import calculate_shares, format_shares
+from core_config import PORTFOLIO_CFG
 
 class OptimizedMLStrategy:
     def __init__(self, symbol='SPY', initial_capital=100000, lookback=60, prediction_horizon=5):
@@ -29,11 +68,12 @@ class OptimizedMLStrategy:
         
     def download_data(self, start_date, end_date):
         """Download historical data - request extra days to account for trading days only"""
+        yf_module = _ensure_yfinance()
         # Add buffer for weekends/holidays (multiply by 1.5 to get enough trading days)
         days_diff = (end_date - start_date).days
         buffer_start = end_date - timedelta(days=int(days_diff * 1.5))
         
-        data = yf.download(self.symbol, start=buffer_start, end=end_date, progress=False)
+        data = yf_module.download(self.symbol, start=buffer_start, end=end_date, progress=False)
         if isinstance(data.columns, pd.MultiIndex):
             data.columns = data.columns.droplevel(1)
         return data
@@ -43,63 +83,72 @@ class OptimizedMLStrategy:
         return self.create_features(data)
     
     def create_features(self, data):
-        """Create comprehensive technical indicators"""
+        """Create comprehensive technical indicators using canonical Price column"""
         df = data.copy()
         
-        # Returns and momentum
-        df['Returns'] = df['Close'].pct_change()
-        df['Log_Returns'] = np.log(df['Close'] / df['Close'].shift(1))
+        # Ensure we have canonical Price column
+        if 'Price' not in df.columns:
+            if 'Adj Close' in df.columns:
+                df['Price'] = df['Adj Close']
+            elif 'Close' in df.columns:
+                df['Price'] = df['Close']
+            else:
+                raise ValueError("No price column found")
         
-        # Multiple timeframe moving averages
+        # Returns and momentum (use canonical Price)
+        df['Returns'] = df['Price'].pct_change()
+        df['Log_Returns'] = np.log(df['Price'] / df['Price'].shift(1))
+        
+        # Multiple timeframe moving averages (use canonical Price)
         for period in [5, 10, 20, 50, 100, 200]:
-            df[f'SMA_{period}'] = df['Close'].rolling(window=period).mean()
-            df[f'EMA_{period}'] = df['Close'].ewm(span=period, adjust=False).mean()
-            df[f'Price_to_SMA_{period}'] = df['Close'] / df[f'SMA_{period}']
+            df[f'SMA_{period}'] = df['Price'].rolling(window=period).mean()
+            df[f'EMA_{period}'] = df['Price'].ewm(span=period, adjust=False).mean()
+            df[f'Price_to_SMA_{period}'] = df['Price'] / df[f'SMA_{period}']
         
         # Volatility metrics
         for period in [10, 20, 50]:
             df[f'Volatility_{period}'] = df['Returns'].rolling(window=period).std()
             df[f'ATR_{period}'] = (df['High'] - df['Low']).rolling(window=period).mean()
         
-        # Rate of Change
+        # Rate of Change (use canonical Price)
         for period in [5, 10, 20, 30]:
-            df[f'ROC_{period}'] = ((df['Close'] - df['Close'].shift(period)) / df['Close'].shift(period)) * 100
+            df[f'ROC_{period}'] = ((df['Price'] - df['Price'].shift(period)) / df['Price'].shift(period)) * 100
         
-        # RSI for multiple periods
+        # RSI for multiple periods (use canonical Price)
         for period in [7, 14, 21]:
-            delta = df['Close'].diff()
+            delta = df['Price'].diff()
             gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
             loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
             rs = gain / loss
             df[f'RSI_{period}'] = 100 - (100 / (1 + rs))
         
-        # MACD variations
-        exp1 = df['Close'].ewm(span=12, adjust=False).mean()
-        exp2 = df['Close'].ewm(span=26, adjust=False).mean()
+        # MACD variations (use canonical Price)
+        exp1 = df['Price'].ewm(span=12, adjust=False).mean()
+        exp2 = df['Price'].ewm(span=26, adjust=False).mean()
         df['MACD'] = exp1 - exp2
         df['MACD_Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
         df['MACD_Hist'] = df['MACD'] - df['MACD_Signal']
         
-        # Bollinger Bands
+        # Bollinger Bands (use canonical Price)
         for period in [10, 20, 50]:
-            bb_middle = df['Close'].rolling(window=period).mean()
-            bb_std = df['Close'].rolling(window=period).std()
+            bb_middle = df['Price'].rolling(window=period).mean()
+            bb_std = df['Price'].rolling(window=period).std()
             df[f'BB_Upper_{period}'] = bb_middle + (2 * bb_std)
             df[f'BB_Lower_{period}'] = bb_middle - (2 * bb_std)
             df[f'BB_Width_{period}'] = (df[f'BB_Upper_{period}'] - df[f'BB_Lower_{period}']) / bb_middle
-            df[f'BB_Position_{period}'] = (df['Close'] - df[f'BB_Lower_{period}']) / (df[f'BB_Upper_{period}'] - df[f'BB_Lower_{period}'])
+            df[f'BB_Position_{period}'] = (df['Price'] - df[f'BB_Lower_{period}']) / (df[f'BB_Upper_{period}'] - df[f'BB_Lower_{period}'])
         
-        # Volume analysis
+        # Volume analysis (OBV use canonical Price)
         df['Volume_SMA_20'] = df['Volume'].rolling(window=20).mean()
         df['Volume_Ratio'] = df['Volume'] / df['Volume_SMA_20']
-        df['OBV'] = (np.sign(df['Close'].diff()) * df['Volume']).fillna(0).cumsum()
+        df['OBV'] = (np.sign(df['Price'].diff()) * df['Volume']).cumsum()  # No fillna(0)
         df['OBV_EMA'] = df['OBV'].ewm(span=20).mean()
         
-        # Price patterns
-        df['HL_Ratio'] = (df['High'] - df['Low']) / df['Close']
-        df['OC_Ratio'] = (df['Open'] - df['Close']) / df['Close']
-        df['Upper_Shadow'] = (df['High'] - np.maximum(df['Open'], df['Close'])) / df['Close']
-        df['Lower_Shadow'] = (np.minimum(df['Open'], df['Close']) - df['Low']) / df['Close']
+        # Price patterns (use canonical Price where appropriate)
+        df['HL_Ratio'] = (df['High'] - df['Low']) / df['Price']
+        df['OC_Ratio'] = (df['Open'] - df['Price']) / df['Price'] if 'Open' in df.columns else 0
+        df['Upper_Shadow'] = (df['High'] - np.maximum(df.get('Open', df['Price']), df['Price'])) / df['Price']
+        df['Lower_Shadow'] = (np.minimum(df.get('Open', df['Price']), df['Price']) - df['Low']) / df['Price']
         
         # Lag features
         for lag in [1, 2, 3, 5, 10]:
@@ -167,6 +216,8 @@ class OptimizedMLStrategy:
     
     def optimize_hyperparameters(self, X_train, y_train, n_trials=30):
         """Optimize hyperparameters using Optuna"""
+        _ensure_optuna()  # Ensure optuna is available
+        
         print("\n" + "="*50)
         print("OPTIMIZING HYPERPARAMETERS")
         print("="*50)
@@ -232,10 +283,30 @@ class OptimizedMLStrategy:
         
         return ensemble_proba
     
-    def backtest(self, start_date, end_date, optimize_params=True, n_trials=30):
-        """Run optimized backtest"""
-        print("\nDownloading data...")
-        data = self.download_data(start_date, end_date)
+    def backtest(self, start_date, end_date, optimize_params=True, n_trials=30, data=None):
+        """
+        Run optimized backtest
+        
+        Args:
+            start_date: Start date for backtest
+            end_date: End date for backtest
+            optimize_params: Whether to optimize hyperparameters
+            n_trials: Number of optimization trials
+            data: Optional pre-fetched DataFrame. If None, will download.
+        """
+        # Use provided data or download
+        if data is None:
+            print("\nDownloading data...")
+            data = self.download_data(start_date, end_date)
+        else:
+            # Normalize provided data
+            from data_normalization import DataNormalizer
+            normalizer = DataNormalizer()
+            data, _ = normalizer.normalize_market_data(
+                data.copy(), 
+                symbol=self.symbol, 
+                require_ohlc=False
+            )
         
         # Validate data
         if data is None or len(data) == 0:
@@ -291,15 +362,21 @@ class OptimizedMLStrategy:
             if pd.isna(row['Prediction']):
                 continue
                 
-            price = row['Close']
+            price = row['Price'] if 'Price' in row else row['Close']
             confidence = row['Ensemble_Proba']
             
             # Dynamic position sizing based on confidence
             position_size = min(0.95, 0.5 + (confidence - 0.5))
             
-            # Buy signal
+            # Buy signal with centralized sizing
             if row['Prediction'] == 1 and shares == 0 and confidence > 0.55:
-                shares = int(self.cash * position_size / price)
+                target_cash = self.cash * position_size
+                shares, cash_residual = calculate_shares(
+                    target_value=target_cash,
+                    price=price,
+                    fractional_allowed=PORTFOLIO_CFG.FRACTIONAL_SHARES_ALLOWED
+                )
+                
                 cost = shares * price
                 self.cash -= cost
                 trades.append((date, 'BUY', price, shares, confidence))
@@ -354,8 +431,9 @@ class OptimizedMLStrategy:
         
         if len(trades) >= 8:
             print(f"\nRecent Trades:")
+            shares_fmt = format_shares(shares=0, fractional_allowed=PORTFOLIO_CFG.FRACTIONAL_SHARES_ALLOWED)
             for trade in trades[-8:]:
-                print(f"  {trade[0].strftime('%Y-%m-%d')} {trade[1]:4s} {trade[3]:3d} shares @ ${trade[2]:7.2f} (conf: {trade[4]:.3f})")
+                print(f"  {trade[0].strftime('%Y-%m-%d')} {trade[1]:4s} {trade[3]:{shares_fmt}} shares @ ${trade[2]:7.2f} (conf: {trade[4]:.3f})")
 
 if __name__ == "__main__":
     strategy = OptimizedMLStrategy(symbol='SPY', lookback=60, prediction_horizon=5)

@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Tuple
 from enum import Enum
+from core_config import PORTFOLIO_CFG
 
 
 class PositionSizeMethod(Enum):
@@ -49,16 +50,20 @@ class RiskManager:
                                method: PositionSizeMethod = PositionSizeMethod.PERCENT_EQUITY,
                                win_rate: float = 0.5,
                                avg_win: float = 0.02,
-                               avg_loss: float = 0.01) -> int:
-        """Calculate optimal position size based on risk parameters"""
+                               avg_loss: float = 0.01) -> float:
+        """Calculate optimal position size based on risk parameters
+        
+        Returns:
+            float: Number of shares (float if fractional enabled, int otherwise)
+        """
         
         if method == PositionSizeMethod.FIXED:
-            max_shares = int(current_equity * self.max_position_size / price)
+            max_shares = current_equity * self.max_position_size / price
             
         elif method == PositionSizeMethod.PERCENT_EQUITY:
             risk_amount = current_equity * self.max_portfolio_risk
             shares_at_risk = risk_amount / (price * self.stop_loss_pct)
-            max_shares = int(min(shares_at_risk, current_equity * self.max_position_size / price))
+            max_shares = min(shares_at_risk, current_equity * self.max_position_size / price)
             
         elif method == PositionSizeMethod.KELLY:
             # Kelly Criterion: f = (p*b - q) / b where p=win rate, q=loss rate, b=win/loss ratio
@@ -69,7 +74,7 @@ class RiskManager:
                 kelly_fraction = (win_rate * b - (1 - win_rate)) / b
                 kelly_fraction = max(0, min(kelly_fraction * 0.5, 0.25))  # Half Kelly with cap
             
-            max_shares = int(current_equity * kelly_fraction / price)
+            max_shares = current_equity * kelly_fraction / price
             
         elif method == PositionSizeMethod.VOLATILITY_TARGET:
             target_vol = 0.15  # 15% annual volatility target
@@ -79,7 +84,7 @@ class RiskManager:
             else:
                 position_fraction = target_vol / position_vol_contribution
                 position_fraction = min(position_fraction, self.max_position_size)
-                max_shares = int(current_equity * position_fraction / price)
+                max_shares = current_equity * position_fraction / price
                 
         else:  # RISK_PARITY
             # Equal risk contribution
@@ -87,11 +92,15 @@ class RiskManager:
                 max_shares = 0
             else:
                 risk_budget = current_equity * self.max_portfolio_risk
-                max_shares = int(risk_budget / (price * volatility * np.sqrt(252)))
+                max_shares = risk_budget / (price * volatility * np.sqrt(252))
         
         # Apply leverage limit
         max_exposure = current_equity * self.max_leverage
-        max_shares = min(max_shares, int(max_exposure / price))
+        max_shares = min(max_shares, max_exposure / price)
+        
+        # Apply fractional share logic
+        if not PORTFOLIO_CFG.FRACTIONAL_SHARES_ALLOWED:
+            max_shares = int(max_shares)  # Floor to whole shares
         
         return max(0, max_shares)
     
@@ -214,7 +223,10 @@ class RiskManager:
             price = current_prices.get(symbol, 0)
             
             if price > 0:
-                shares_diff = int(value_diff / price)
+                shares_diff = value_diff / price
+                # Apply fractional share logic
+                if not PORTFOLIO_CFG.FRACTIONAL_SHARES_ALLOWED:
+                    shares_diff = int(shares_diff)
                 if abs(shares_diff) > 0:
                     rebalance_trades[symbol] = shares_diff
         

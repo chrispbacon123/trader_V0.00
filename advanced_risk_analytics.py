@@ -36,18 +36,18 @@ class AdvancedRiskAnalytics:
             return 0.0
             
         if method == 'historical':
-            return np.percentile(self.returns, (1 - self.confidence_level) * 100)
+            return float(np.percentile(self.returns, (1 - self.confidence_level) * 100))
         
         elif method == 'parametric':
-            mu = self.returns.mean()
-            sigma = self.returns.std()
+            mu = float(self.returns.mean())
+            sigma = float(self.returns.std())
             z_score = stats.norm.ppf(1 - self.confidence_level)
             return mu + sigma * z_score
         
         elif method == 'cornish_fisher':
             # Cornish-Fisher expansion for non-normal distributions
-            mu = self.returns.mean()
-            sigma = self.returns.std()
+            mu = float(self.returns.mean())
+            sigma = float(self.returns.std())
             skew = stats.skew(self.returns)
             kurt = stats.kurtosis(self.returns)
             
@@ -66,7 +66,7 @@ class AdvancedRiskAnalytics:
             return 0.0
             
         var = self.value_at_risk('historical')
-        return self.returns[self.returns <= var].mean()
+        return float(self.returns[self.returns <= var].mean())
     
     def maximum_drawdown_duration(self) -> int:
         """Calculate maximum drawdown duration in periods"""
@@ -83,7 +83,7 @@ class AdvancedRiskAnalytics:
         current_period = 0
         
         for underwater in is_underwater:
-            if underwater:
+            if bool(underwater):
                 current_period += 1
             else:
                 if current_period > 0:
@@ -112,8 +112,8 @@ class AdvancedRiskAnalytics:
         if len(self.returns) == 0:
             return 0.0
             
-        total_return = (1 + self.returns).prod() - 1
-        pain = abs(self.returns[self.returns < 0].sum())
+        total_return = float((1 + self.returns).prod() - 1)
+        pain = float(abs(self.returns[self.returns < 0].sum()))
         
         if pain != 0:
             return total_return / pain
@@ -132,9 +132,12 @@ class AdvancedRiskAnalytics:
         returns_above = self.returns[self.returns > threshold] - threshold
         returns_below = threshold - self.returns[self.returns < threshold]
         
-        if returns_below.sum() != 0:
-            return returns_above.sum() / returns_below.sum()
-        return float('inf') if returns_above.sum() > 0 else 1.0
+        sum_below = float(returns_below.sum())
+        sum_above = float(returns_above.sum())
+        
+        if sum_below != 0:
+            return sum_above / sum_below
+        return float('inf') if sum_above > 0 else 1.0
     
     def ulcer_index(self) -> float:
         """Calculate Ulcer Index (measure of downside volatility)"""
@@ -157,10 +160,10 @@ class AdvancedRiskAnalytics:
         cum_returns = (1 + self.returns).cumprod()
         running_max = cum_returns.expanding().max()
         drawdown = (cum_returns - running_max) / running_max
-        max_dd = abs(drawdown.min())
+        max_dd = float(abs(drawdown.min()))
         
         if max_dd != 0:
-            return annual_return / max_dd
+            return float(annual_return) / max_dd
         return 0.0
     
     def burke_ratio(self, periods_per_year: int = 252) -> float:
@@ -168,13 +171,13 @@ class AdvancedRiskAnalytics:
         if len(self.returns) == 0:
             return 0.0
             
-        annual_return = (1 + self.returns.mean()) ** periods_per_year - 1
+        annual_return = float((1 + self.returns.mean()) ** periods_per_year - 1)
         
         cum_returns = (1 + self.returns).cumprod()
         running_max = cum_returns.expanding().max()
         drawdowns = (cum_returns - running_max) / running_max
         
-        burke_denominator = np.sqrt(np.sum(drawdowns ** 2))
+        burke_denominator = float(np.sqrt(np.sum(drawdowns ** 2)))
         
         if burke_denominator != 0:
             return annual_return / burke_denominator
@@ -318,12 +321,17 @@ def calculate_regime_metrics(returns: pd.Series,
         DataFrame with regime classifications
     """
     vol = returns.rolling(volatility_window).std()
-    vol_median = vol.median()
+    vol_median = float(vol.median())
     
     regimes = pd.DataFrame(index=returns.index)
-    regimes['volatility'] = vol
+    regimes['volatility'] = vol.values
     regimes['regime'] = 'Normal'
-    regimes.loc[vol > vol_median * 1.5, 'regime'] = 'High Volatility'
-    regimes.loc[vol < vol_median * 0.5, 'regime'] = 'Low Volatility'
+    
+    # Use boolean indexing properly
+    high_vol_mask = vol > vol_median * 1.5
+    low_vol_mask = vol < vol_median * 0.5
+    
+    regimes.loc[high_vol_mask, 'regime'] = 'High Volatility'
+    regimes.loc[low_vol_mask, 'regime'] = 'Low Volatility'
     
     return regimes

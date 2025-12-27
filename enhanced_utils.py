@@ -1,7 +1,6 @@
 """
 Enhanced utilities with comprehensive error handling and validation
 """
-import yfinance as yf
 import pandas as pd
 import numpy as np
 import re
@@ -11,6 +10,23 @@ import time
 from datetime import datetime, timedelta
 from functools import wraps
 import urllib.request
+
+# Lazy import yfinance - only when needed
+yf = None
+
+def _ensure_yfinance():
+    """Lazy load yfinance when needed for live data"""
+    global yf
+    if yf is None:
+        try:
+            import yfinance as yf_module
+            yf = yf_module
+        except ImportError:
+            raise ImportError(
+                "yfinance is required to fetch live market data.\n"
+                "Install it with: pip install yfinance\n"
+                "Or provide data via CSV/DataFrame to avoid this dependency."
+            )
 
 class ValidationError(Exception):
     """Custom validation error"""
@@ -151,6 +167,7 @@ def download_data_with_retry(symbol, start, end):
     if not check_internet_connection():
         raise NetworkError("No internet connection available")
     
+    _ensure_yfinance()
     data = yf.download(symbol, start=start, end=end, progress=False)
     
     if data.empty:
@@ -328,13 +345,13 @@ class ProgressTracker:
 
 def validate_backtest_data(symbol, start_date, end_date, min_days=20):
     """Validate data availability before running backtest"""
-    import yfinance as yf
     from datetime import timedelta
     
     # Request more calendar days to ensure enough trading days
     buffer_start = start_date - timedelta(days=int((end_date - start_date).days * 0.5))
     
     try:
+        _ensure_yfinance()
         data = yf.download(symbol, start=buffer_start, end=end_date, progress=False)
         
         if data is None or len(data) == 0:
@@ -344,7 +361,7 @@ def validate_backtest_data(symbol, start_date, end_date, min_days=20):
         if trading_days < min_days:
             return False, f"Insufficient data: {trading_days} trading days (need {min_days})"
         
-        return True, f"✓ {trading_days} trading days available"
+        return True, f"OK {trading_days} trading days available"
         
     except Exception as e:
         return False, f"Error downloading data: {e}"

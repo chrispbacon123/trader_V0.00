@@ -3,13 +3,29 @@ Data Handler Module
 Centralized data fetching and management for all strategies
 """
 
-import yfinance as yf
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict
 import warnings
 warnings.filterwarnings('ignore')
+
+# Lazy import yfinance - only when needed
+yf = None
+
+def _ensure_yfinance():
+    """Lazy load yfinance when needed for live data"""
+    global yf
+    if yf is None:
+        try:
+            import yfinance as yf_module
+            yf = yf_module
+        except ImportError:
+            raise ImportError(
+                "yfinance is required to fetch live market data.\n"
+                "Install it with: pip install yfinance\n"
+                "Or provide data via CSV/DataFrame to avoid this dependency."
+            )
 
 
 class DataHandler:
@@ -40,6 +56,7 @@ class DataHandler:
         
         try:
             # Download data
+            _ensure_yfinance()
             df = yf.download(
                 symbol,
                 start=start_date,
@@ -90,6 +107,7 @@ class DataHandler:
     def get_latest_price(self, symbol: str) -> Optional[float]:
         """Get the latest price for a symbol"""
         try:
+            _ensure_yfinance()
             ticker = yf.Ticker(symbol)
             data = ticker.history(period='1d')
             if len(data) > 0:
@@ -101,6 +119,7 @@ class DataHandler:
     def validate_symbol(self, symbol: str) -> bool:
         """Check if a symbol is valid"""
         try:
+            _ensure_yfinance()
             ticker = yf.Ticker(symbol)
             info = ticker.info
             return 'symbol' in info or 'shortName' in info

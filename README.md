@@ -1,9 +1,85 @@
 # Advanced Quantitative Trading Platform 🚀
 
+> **🎉 V0.14 PRODUCTION HARDENING COMPLETE** ✅  
+> Platform consolidation, robustness, and optimization reliability complete.
+> 
+> **📚 START HERE:**
+> - **Quick overview:** Read this README
+> - **Run tests:** `pytest` (from any directory in repo)
+> - **Smoke test:** `python scripts/smoke_platform.py` (offline, no dependencies)
+> - **Run UI:** `python advanced_trading_interface.py`
+
 Professional-grade algorithmic trading platform with ML-powered strategies, advanced analytics, and comprehensive risk management.
+
+---
+
+## 🆕 What's New - V0.14 (December 2024)
+
+### V0.14 Production Hardening ✅
+- **Version Consolidation:** Single canonical version in `core_config.PLATFORM_VERSION`
+- **Smoke Test Runner:** `scripts/smoke_platform.py` runs offline with fixtures
+- **Test Cleanup:** Root-level test files renamed to `smoke_*.py` to avoid pytest confusion
+- **Integration Tests:** 75+ tests covering all core functionality
+- **Schema Stability:** All API responses have guaranteed keys (no KeyError crashes)
+- **Optional Dependencies:** yfinance/optuna lazy-loaded, UI works without them
+
+### Key Improvements
+1. **Centralized Versioning:** `core_config.PLATFORM_VERSION` is the single source of truth
+2. **Smoke Test:** `python scripts/smoke_platform.py` validates full pipeline offline
+3. **Robust Schemas:** `result_schemas.py` provides typed result objects
+4. **Persistence Safety:** `persistence.py` normalizes old records, no KeyError
+5. **Optimizer Stability:** Always returns `best_params={}` (never None), failure summary
+
+### Run Commands
+```powershell
+# Run tests (from repo root)
+pytest
+
+# Run smoke test (offline, no yfinance needed)
+python scripts/smoke_platform.py
+
+# Run UI
+python advanced_trading_interface.py
+```
+
+---
+
+## 🔄 Version History
+
+### V0.14 (Current) - Production Hardening
+- Centralized versioning
+- Smoke test runner
+- Schema stability guarantees
+- 75+ tests passing
+
+### V0.13 - Optimization Reliability
+- Double-fetch bug fixed
+- Optimizer schema stability
+- Random search support
+- Memory-safe grid sampling
+
+### V0.12 - Correctness Pass
+- Data normalization unified
+- Risk metrics labeled (daily vs annualized)
+- Fractional shares end-to-end
+
+### V0.03-V0.11 - Platform Development
+- Test infrastructure (pytest)
+- Optional dependencies
+- Validated modules
+- ML strategies
+
+---
 
 ## Quick Start
 
+### Windows
+```powershell
+cd trader_V0.00
+python advanced_trading_interface.py
+```
+
+### Mac/Linux
 ```bash
 # Clone repository
 git clone https://github.com/chrispbacon123/trader_V0.00.git
@@ -11,7 +87,7 @@ cd trader_V0.00
 
 # Create virtual environment and install dependencies
 python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate
 pip install pandas numpy scikit-learn yfinance matplotlib seaborn plotly scipy joblib ta-lib
 
 # Launch the platform
@@ -43,16 +119,28 @@ pip install pandas numpy scikit-learn yfinance matplotlib seaborn plotly scipy j
 
 ## Installation
 
-The quick start above covers installation. For manual setup:
+### Windows Installation
+```powershell
+# Install Python 3.12
+winget install Python.Python.3.12
 
+# Install required packages
+python -m pip install yfinance pandas numpy scikit-learn xgboost optuna
+
+# Run the platform
+cd trader_V0.00
+python advanced_trading_interface.py
+```
+
+### Mac/Linux Installation
 ```bash
 # Option 1: Using virtual environment (recommended)
 python3 -m venv venv
 source venv/bin/activate
-pip install pandas numpy scikit-learn yfinance matplotlib seaborn plotly scipy joblib ta-lib
+pip install pandas numpy scikit-learn yfinance matplotlib seaborn plotly scipy joblib ta-lib xgboost optuna
 
 # Option 2: Using system Python (not recommended)
-pip install --user pandas numpy scikit-learn yfinance matplotlib seaborn plotly scipy joblib ta-lib
+pip install --user pandas numpy scikit-learn yfinance matplotlib seaborn plotly scipy joblib ta-lib xgboost optuna
 ```
 
 **Note:** The platform requires Python 3.8+ and uses a virtual environment to avoid conflicts.
@@ -127,3 +215,106 @@ chmod +x launch.sh
 ---
 
 **Always validate strategies thoroughly before deploying real capital.**
+
+---
+
+## Recent Updates (December 2024)
+
+### Data Integrity Fixes ✅
+Fixed critical issues with support/resistance and pattern recognition calculations:
+
+**Issues Resolved:**
+- Support/resistance levels were analyzing entire historical dataset, mixing old price ranges
+- Pattern recognition could include outlier levels from different market conditions
+- Potential cross-contamination between different symbols
+
+**Fixes Applied:**
+- Limited support/resistance analysis to recent 100 days only
+- Added 20% price proximity filter to current price
+- Enhanced pattern recognition with temporal bounds
+- Added fallback logic for edge cases
+- Created comprehensive test suite (`test_data_integrity.py`)
+
+**Impact:** Market analytics now provide accurate, relevant levels for current trading decisions without historical contamination.
+
+**Files Modified:**
+- `market_analytics.py` - Fixed support_resistance_levels()
+- `advanced_indicators.py` - Fixed PatternRecognition.find_support_resistance()
+- `test_data_integrity.py` - New test suite for data validation
+
+**Testing:** Run `python test_data_integrity.py` to verify data integrity after updates.
+
+### Dependencies Updated
+Added required packages for ML strategies:
+- `xgboost` - Gradient boosting for ML strategies
+- `optuna` - Hyperparameter optimization
+
+---
+
+## System Validation & Testing 🧪
+
+### Deterministic Test Harness
+The platform includes a comprehensive test suite that validates all trading system invariants:
+
+**Run Tests:**
+```bash
+python run_deterministic_tests.py
+```
+
+**What's Tested:**
+- ✓ Canonical price series consistency (no MultiIndex confusion)
+- ✓ Technical indicators bounded (RSI/Stoch/ADX in [0,100])
+- ✓ MACD histogram = MACD - Signal
+- ✓ Fibonacci anchors from declared lookback window
+- ✓ Support/Resistance within proximity filter
+- ✓ Market regime reconciles with ADX
+- ✓ Risk metrics properly annualized and labeled
+- ✓ Fractional share support (when enabled)
+- ✓ Cash residuals tracked explicitly
+- ✓ Edge cases handled (flat prices, short history, NaNs)
+
+**Test Data:**
+- Uses synthetic deterministic data generators (no live API calls required)
+- Frozen SPY fixture available in `tests/data/spy_daily.csv`
+- All tests are reproducible and seeded
+
+**Documentation:**
+- See `DETERMINISTIC_TESTS_COMPLETE.md` for full details
+- Pytest suite also available in `tests/test_comprehensive.py`
+
+### Validated Modules
+The platform uses a validated architecture with explicit guarantees:
+
+**Core Modules:**
+- `canonical_data.py` - Single canonical price series, no MultiIndex
+- `validated_indicators.py` - Wilder's RSI/ADX, bounded outputs
+- `validated_levels.py` - Auditable Fibonacci anchors, proximity-filtered S/R
+- `validated_regime.py` - Regime classification with rationale
+- `validated_risk.py` - Labeled daily/annualized metrics
+- `validated_portfolio.py` - Fractional share support with cash tracking
+
+**Configuration:**
+- All lookback windows centralized in `core_config.py`
+- No magic numbers scattered in code
+- Realistic default thresholds (e.g., 12-25% annualized volatility)
+
+### Fractional Share Support
+The platform fully supports fractional shares (broker-dependent):
+
+**Enable/Disable:**
+```python
+# In core_config.py
+PORTFOLIO_CFG.FRACTIONAL_SHARES_ALLOWED = True  # or False
+```
+
+**Behavior:**
+- When `True`: Shares are floats (e.g., 132.4567 shares)
+- When `False`: Shares rounded down to integers (e.g., 132 shares)
+- Cash residuals explicitly tracked in both cases
+- Transaction costs and slippage properly applied
+
+**Files Updated:**
+- `validated_portfolio.py` - Core allocation logic
+- `ml_strategy.py`, `optimized_ml_strategy.py`, `simple_strategy.py`, `short_term_strategy.py` - All strategies support fractional shares
+
+---

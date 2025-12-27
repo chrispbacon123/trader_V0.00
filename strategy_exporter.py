@@ -12,7 +12,10 @@ from pathlib import Path
 class StrategyExporter:
     """Handles exporting strategies for deployment"""
     
-    def __init__(self, export_dir='/Users/jonathanbrooks/lean-trading/live_strategies'):
+    def __init__(self, export_dir=None):
+        if export_dir is None:
+            # Default to a relative path in the current working directory
+            export_dir = Path(__file__).parent / 'live_strategies'
         self.export_dir = Path(export_dir)
         self.export_dir.mkdir(exist_ok=True)
     

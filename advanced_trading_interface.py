@@ -8,18 +8,42 @@ import sys
 import os
 from datetime import datetime, timedelta
 from typing import Optional
-from itertools import product
+from itertools import product as iter_product
 import pandas as pd
 import numpy as np
 import json
-import yfinance as yf
+import math
 from collections import defaultdict
+
+# Lazy import yfinance - optional dependency
+yf = None
+
+def _ensure_yfinance():
+    """Lazy load yfinance when needed for live data"""
+    global yf
+    if yf is None:
+        try:
+            import yfinance as yf_module
+            yf = yf_module
+        except ImportError:
+            raise ImportError(
+                "yfinance is required for live data fetching. "
+                "Install with: pip install yfinance"
+            )
+    return yf
 
 # Import strategies
 from simple_strategy import SimpleMeanReversionStrategy
 from ml_strategy import MLTradingStrategy
-from optimized_ml_strategy import OptimizedMLStrategy
 from short_term_strategy import ShortTermStrategy
+
+# Try to import OptimizedMLStrategy (requires optuna)
+try:
+    from optimized_ml_strategy import OptimizedMLStrategy
+    OPTIMIZED_ML_AVAILABLE = True
+except ImportError:
+    OptimizedMLStrategy = None
+    OPTIMIZED_ML_AVAILABLE = False
 
 # Import enhanced utilities
 from enhanced_utils import (
@@ -49,6 +73,12 @@ from strategy_builder import StrategyBuilder
 from advanced_risk_analytics import (
     AdvancedRiskAnalytics, MonteCarloSimulator,
     WalkForwardOptimizer, calculate_regime_metrics
+)
+
+# Import persistence utilities
+from persistence import (
+    normalize_run_record, load_history, append_history,
+    safe_get, format_history_summary
 )
 
 
@@ -98,7 +128,7 @@ class AdvancedTradingInterface:
         self.strategy_builder = StrategyBuilder()
         self.backtest_engine = UnifiedBacktestEngine()
         self.load_all_data()
-        
+    
     def load_sector_data(self):
         """Load sector/industry classifications"""
         return {
@@ -122,13 +152,8 @@ class AdvancedTradingInterface:
             except:
                 self.portfolios = {}
         
-        # Load history
-        if os.path.exists('strategy_history.json'):
-            try:
-                with open('strategy_history.json', 'r') as f:
-                    self.results_history = json.load(f)
-            except:
-                self.results_history = []
+        # Load history using centralized persistence module
+        self.results_history = load_history('strategy_history.json')
     
     def save_all_data(self):
         """Save portfolios and history"""
@@ -137,9 +162,10 @@ class AdvancedTradingInterface:
         with open('portfolios.json', 'w') as f:
             json.dump(portfolio_data, f, indent=2, default=str)
         
-        # Save history
+        # Save history - normalize all records before saving
+        normalized_history = [normalize_run_record(r) for r in self.results_history]
         with open('strategy_history.json', 'w') as f:
-            json.dump(self.results_history, f, indent=2, default=str)
+            json.dump(normalized_history, f, indent=2, default=str)
     
     def save_portfolio(self, portfolio: Portfolio):
         """Save a single portfolio to file"""
@@ -225,6 +251,7 @@ class AdvancedTradingInterface:
     def get_asset_info(self, symbol):
         """Get basic asset information"""
         try:
+            _ensure_yfinance()
             ticker = yf.Ticker(symbol)
             info = ticker.info
             return {
@@ -255,6 +282,7 @@ class AdvancedTradingInterface:
         
         # Validate data availability first
         try:
+            _ensure_yfinance()
             test_data = yf.download(symbol, period='1mo', progress=False)
             if test_data.empty:
                 print(f"\n❌ No data available for {symbol}. Please check the symbol and try again.")
@@ -355,6 +383,12 @@ class AdvancedTradingInterface:
                 }
                 
             elif strategy_choice == '3':
+                if not OPTIMIZED_ML_AVAILABLE:
+                    print("\nOptimized ML Strategy requires the 'optuna' package.")
+                    print("Install with: pip install optuna")
+                    input("\nPress Enter to continue...")
+                    return
+                
                 n_trials = input("Number of optimization trials (default: 20): ").strip()
                 n_trials = int(n_trials) if n_trials.isdigit() else 20
                 
@@ -448,6 +482,7 @@ class AdvancedTradingInterface:
         # Validate symbol
         print(f"\n🔍 Validating {symbol}...")
         try:
+            _ensure_yfinance()
             test_data = yf.download(symbol, period='1mo', progress=False)
             if test_data.empty:
                 print(f"❌ No data available for {symbol}")
@@ -570,8 +605,8 @@ class AdvancedTradingInterface:
                 'error': str(e)[:100]
             })
         
-        # Test 4: Optimized (if period allows)
-        if days >= 365:
+        # Test 4: Optimized (if period allows and optuna available)
+        if days >= 365 and OPTIMIZED_ML_AVAILABLE:
             print("\n4/4 Testing Optimized Ensemble (3 trials, suppressing output)...")
             try:
                 import sys, io
@@ -729,6 +764,7 @@ class AdvancedTradingInterface:
         
         # Validate all symbols first
         print(f"\n🔍 Validating {len(symbols)} symbols...")
+        _ensure_yfinance()
         valid_symbols = []
         for sym in symbols:
             try:
@@ -1121,9 +1157,12 @@ class AdvancedTradingInterface:
                 print(f"   Result: ${capital_allocated:,.0f} → ${result.final_value:,.0f} ({result.total_return:.2f}%)")
             
             if allocations.get('Optimized', 0) > 0:
-                print(f"\n→ Testing Optimized strategy ({allocations['Optimized']:.0f}%)...")
-                capital_allocated = portfolio.initial_capital * (allocations['Optimized'] / 100)
-                strategy = OptimizedMLStrategy(symbol=symbol, lookback=60, prediction_horizon=5)
+                if not OPTIMIZED_ML_AVAILABLE:
+                    print(f"\n→ Skipping Optimized strategy (requires optuna)")
+                else:
+                    print(f"\n→ Testing Optimized strategy ({allocations['Optimized']:.0f}%)...")
+                    capital_allocated = portfolio.initial_capital * (allocations['Optimized'] / 100)
+                    strategy = OptimizedMLStrategy(symbol=symbol, lookback=60, prediction_horizon=5)
                 
                 result = self.backtest_engine.run_backtest(
                     strategy=strategy,
@@ -1199,6 +1238,7 @@ class AdvancedTradingInterface:
         
         try:
             # Download data
+            _ensure_yfinance()
             ticker = yf.Ticker(symbol)
             hist = ticker.history(period="1y")
             
@@ -1263,7 +1303,7 @@ class AdvancedTradingInterface:
             print(f"\n❌ Error: {e}")
     
     def view_history(self):
-        """View all results history"""
+        """View all results history with schema-stable display"""
         print("\n" + "═"*90)
         print("RESULTS HISTORY")
         print("═"*90)
@@ -1277,10 +1317,22 @@ class AdvancedTradingInterface:
         print("-"*90)
         
         for i, r in enumerate(self.results_history[-20:], 1):
-            timestamp = datetime.fromisoformat(r['timestamp']).strftime('%Y-%m-%d %H:%M')
-            strategy = r['strategy'][:20]
-            symbol = r['symbol']
-            return_pct = r.get('return_pct', 0)
+            # Normalize schema - support old and new history formats
+            timestamp_str = r.get('timestamp', datetime.now().isoformat())
+            try:
+                timestamp = datetime.fromisoformat(timestamp_str).strftime('%Y-%m-%d %H:%M')
+            except:
+                timestamp = timestamp_str[:16] if len(timestamp_str) >= 16 else timestamp_str
+            
+            # Try different possible key names for strategy
+            strategy = r.get('strategy', r.get('strategy_name', r.get('model', 'Unknown')))[:20]
+            
+            # Try different possible key names for symbol
+            symbol = r.get('symbol', r.get('ticker', 'N/A'))
+            
+            # Get return with fallback
+            return_pct = r.get('return_pct', r.get('total_return', r.get('return', 0)))
+            
             print(f"{i:2d}. [{timestamp}] {strategy:<20} {symbol:<8} {return_pct:>7.2f}%")
     
     def compare_portfolios(self):
@@ -1848,11 +1900,24 @@ class AdvancedTradingInterface:
             '1': ('ShortTermStrategy', 'Short-Term'),
             '2': ('SimpleMeanReversionStrategy', 'Simple Mean Reversion'),
             '3': ('MLTradingStrategy', 'ML Single'),
-            '4': ('OptimizedMLStrategy', 'Optimized Ensemble')
         }
+        
+        # Add OptimizedMLStrategy if available
+        if OPTIMIZED_ML_AVAILABLE:
+            strategy_types['4'] = ('OptimizedMLStrategy', 'Optimized Ensemble')
+        else:
+            strategy_types['4'] = (None, 'Optimized Ensemble (requires optuna)')
         
         if choice not in strategy_types:
             print("Invalid choice")
+            return
+        
+        strategy_name, display_name = strategy_types[choice]
+        
+        # Check if strategy is available
+        if strategy_name is None:
+            print("\nOptimized ML Strategy requires the 'optuna' package.")
+            print("Install with: pip install optuna")
             return
         
         strategy_class, strategy_display = strategy_types[choice]
@@ -2042,6 +2107,10 @@ class AdvancedTradingInterface:
                     prediction_horizon=params.get('prediction_horizon', 5)
                 )
             elif config.strategy_type == 'OptimizedMLStrategy':
+                if not OPTIMIZED_ML_AVAILABLE:
+                    print(f"❌ Strategy requires 'optuna' package. Install with: pip install optuna")
+                    input("\nPress Enter to continue...")
+                    return
                 strategy = OptimizedMLStrategy(
                     symbol=symbol,
                     lookback=params.get('lookback', 60),
@@ -2477,6 +2546,22 @@ class AdvancedTradingInterface:
             import traceback
             traceback.print_exc()
     
+    @staticmethod
+    def _estimate_grid_size(param_grid: dict) -> int:
+        """
+        Estimate the total number of combinations in a parameter grid.
+        O(n) time complexity - does not materialize combinations.
+        
+        Args:
+            param_grid: Dictionary of parameter names to lists of values
+            
+        Returns:
+            Total number of combinations
+        """
+        if not param_grid:
+            return 0
+        return math.prod(len(values) for values in param_grid.values())
+    
     def optimize_strategy_menu(self):
         """Optimize strategy parameters"""
         print("\n" + "═"*90)
@@ -2545,33 +2630,86 @@ class AdvancedTradingInterface:
         metric_map = {'1': 'sharpe_ratio', '2': 'total_return', '3': 'win_rate'}
         metric = metric_map.get(metric_choice, 'sharpe_ratio')
         
+        # Estimate grid size without materializing combinations
+        total_combinations = self._estimate_grid_size(param_grid)
+        combinations_to_test = min(total_combinations, 50)
+        
         # Run optimization
         print(f"\n🔄 Optimizing {strategy_name} on {symbol}...")
-        print(f"   This will test ~{len(list(product(*param_grid.values()))[:50])} combinations...")
+        print(f"   Total possible combinations: {total_combinations:,}")
+        print(f"   Will test up to: {combinations_to_test:,} combinations")
         print("   Please wait...")
         
         try:
-            from itertools import product
+            # Use platform API for optimization
+            from platform_api import get_api
+            from data_normalization import DataContractError
             
-            optimizer = StrategyOptimizer(strategy_class, metric=metric)
-            results = optimizer.grid_search(
-                param_grid, symbol, start_date, end_date,
-                initial_capital=10000, max_combinations=50
+            api = get_api()
+            results = api.optimize_strategy(
+                strategy_class, param_grid, symbol, 
+                start_date, end_date,
+                metric=metric, max_combinations=50
             )
             
             print("\n" + "═"*90)
             print(f"OPTIMIZATION RESULTS - {strategy_name}")
             print("═"*90)
+            
+            # Defensive handling of results
+            if not results.get('success') or not results.get('best_params'):
+                print("\n❌ No valid best parameters found")
+                print(f"\n📊 Summary:")
+                print(f"   Tested: {results.get('tested', 0)}")
+                print(f"   Valid: {results.get('valid', 0)}")
+                print(f"   Failures: {results.get('failures', 0)}")
+                print(f"   Skipped: {results.get('skipped', 0)}")
+                
+                if results.get('error'):
+                    print(f"\n⚠️  Error: {results['error']}")
+                
+                # Show failure categories
+                failure_summary = results.get('failure_summary', {})
+                if failure_summary:
+                    print(f"\n📊 Failure Breakdown:")
+                    for category, count in sorted(failure_summary.items(), key=lambda x: -x[1])[:3]:
+                        print(f"   {category}: {count}")
+                
+                # Show example failures
+                example_failures = results.get('example_failures', [])
+                if example_failures:
+                    print(f"\n📋 Example Failures (first {min(len(example_failures), 3)}):")
+                    for failure in example_failures[:3]:
+                        print(f"   - {failure}")
+                
+                if results.get('warnings'):
+                    print(f"\n⚠️  Warnings:")
+                    for warning in results['warnings']:
+                        print(f"   - {warning}")
+                
+                # Don't offer to save failed results
+                return
+            
+            # Success path - safe to access best_params
             print(f"\n🏆 Best Parameters:")
             for param, value in results['best_params'].items():
                 print(f"   {param}: {value}")
-            print(f"\n📊 Best {metric}: {results['best_score']:.4f}")
             
-            # Show top 5 combinations
-            if results['all_results']:
+            if results['best_score'] is not None:
+                print(f"\n📊 Best {metric}: {results['best_score']:.4f}")
+            
+            print(f"\n📊 Summary:")
+            print(f"   Tested: {results.get('tested', 0)}")
+            print(f"   Valid: {results.get('valid', 0)}")
+            print(f"   Failures: {results.get('failures', 0)}")
+            print(f"   Skipped: {results.get('skipped', 0)}")
+            
+            # Show top 5 combinations (handle both old and new key names)
+            top_results = results.get('top_results') or results.get('all_results', [])
+            if top_results:
                 print(f"\n📋 Top 5 Combinations:")
                 print("─" * 90)
-                for i, result in enumerate(results['all_results'][:5], 1):
+                for i, result in enumerate(top_results[:5], 1):
                     print(f"\n{i}. Score: {result['score']:.4f}")
                     print(f"   Params: {result['params']}")
                     if 'metrics' in result:
@@ -2580,11 +2718,15 @@ class AdvancedTradingInterface:
                               f"Sharpe: {metrics.get('sharpe_ratio', 0):.2f} | "
                               f"Trades: {metrics.get('num_trades', 0)}")
             
-            # Save results
-            save = input("\n\nSave optimization results? (yes/no): ").strip().lower()
-            if save == 'yes':
-                optimizer.save_results()
+            # Save results (note: optimizer not directly accessible, skip save for now)
+            print(f"\n✅ Optimization complete! (Platform version: {results.get('platform_version', 'unknown')})")
             
+        except DataContractError as e:
+            print(f"\n❌ Data Error: {e}")
+            print("\n💡 Suggestions:")
+            print("   - Increase the backtest period (try 365+ days)")
+            print("   - Check if symbol is valid")
+            print("   - Verify data is available for the date range")
         except Exception as e:
             print(f"\n❌ Error during optimization: {e}")
             import traceback
@@ -3051,6 +3193,7 @@ class AdvancedTradingInterface:
         
         try:
             # Get historical data
+            _ensure_yfinance()
             end_date = datetime.now()
             start_date = end_date - timedelta(days=365)
             data = yf.download(symbol, start=start_date, end=end_date, progress=False)
@@ -3139,6 +3282,7 @@ class AdvancedTradingInterface:
         
         try:
             # Get data
+            _ensure_yfinance()
             end_date = datetime.now()
             start_date = end_date - timedelta(days=total_days + 100)
             data = yf.download(symbol, start=start_date, end=end_date, progress=False)
@@ -3235,6 +3379,7 @@ class AdvancedTradingInterface:
         
         try:
             # Get historical data
+            _ensure_yfinance()
             end_date = datetime.now()
             start_date = end_date - timedelta(days=365)
             data = yf.download(symbol, start=start_date, end=end_date, progress=False)
@@ -3245,6 +3390,9 @@ class AdvancedTradingInterface:
             
             # Calculate returns
             returns = data['Close'].pct_change().dropna()
+            # Convert to Series if it's a DataFrame (happens with single ticker yfinance download)
+            if isinstance(returns, pd.DataFrame):
+                returns = returns.squeeze()
             
             # Initialize analytics
             analytics = AdvancedRiskAnalytics(returns)
@@ -3291,7 +3439,9 @@ class AdvancedTradingInterface:
             print("\n✅ Risk analysis completed!")
             
         except Exception as e:
+            import traceback
             print(f"\n❌ Error calculating metrics: {e}")
+            print(f"Traceback: {traceback.format_exc()}")
     
     def run(self):
         """Main interface loop"""

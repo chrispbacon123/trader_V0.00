@@ -4,8 +4,24 @@ Optimized for 7-90 day periods
 Uses faster indicators and momentum signals
 """
 
-import yfinance as yf
 import pandas as pd
+
+# Lazy import yfinance - optional dependency
+yf = None
+
+def _ensure_yfinance():
+    """Lazy load yfinance when needed"""
+    global yf
+    if yf is None:
+        try:
+            import yfinance as yf_module
+            yf = yf_module
+        except ImportError:
+            raise ImportError(
+                "yfinance is required for data download. "
+                "Install with: pip install yfinance"
+            )
+    return yf
 import numpy as np
 from datetime import datetime, timedelta
 
@@ -19,11 +35,12 @@ class ShortTermStrategy:
         
     def download_data(self, start_date, end_date):
         """Download historical data - request extra days to account for trading days only"""
+        yf_module = _ensure_yfinance()
         # Add buffer for weekends/holidays (multiply by 1.5 to get enough trading days)
         days_diff = (end_date - start_date).days
         buffer_start = end_date - timedelta(days=int(days_diff * 1.5))
         
-        data = yf.download(self.symbol, start=buffer_start, end=end_date, progress=False)
+        data = yf_module.download(self.symbol, start=buffer_start, end=end_date, progress=False)
         if isinstance(data.columns, pd.MultiIndex):
             data.columns = data.columns.droplevel(1)
         return data
@@ -73,9 +90,27 @@ class ShortTermStrategy:
         
         return df
     
-    def backtest(self, start_date, end_date):
-        """Run backtest"""
-        data = self.download_data(start_date, end_date)
+    def backtest(self, start_date, end_date, data=None):
+        """
+        Run backtest
+        
+        Args:
+            start_date: Start date for backtest
+            end_date: End date for backtest
+            data: Optional pre-fetched DataFrame. If None, will download.
+        """
+        # Use provided data or download
+        if data is None:
+            data = self.download_data(start_date, end_date)
+        else:
+            # Normalize provided data
+            from data_normalization import DataNormalizer
+            normalizer = DataNormalizer()
+            data, _ = normalizer.normalize_market_data(
+                data.copy(), 
+                symbol=self.symbol, 
+                require_ohlc=False
+            )
         
         # Validate data
         if data is None or len(data) == 0:
@@ -101,12 +136,17 @@ class ShortTermStrategy:
             price = row['Close']
             signal = row['Signal']
             
-            # Buy signal
+            # Buy signal with fractional share support
             if signal == 1 and shares == 0:
-                shares = int(self.cash * 0.95 / price)
-                cost = shares * price
-                self.cash -= cost
-                trades.append((date, 'BUY', price, shares))
+                from sizing import calculate_shares
+                
+                target_cash = self.cash * 0.95
+                shares, _ = calculate_shares(target_cash, price)
+                
+                if shares > 0:
+                    cost = shares * price
+                    self.cash -= cost
+                    trades.append((date, 'BUY', price, shares))
             
             # Sell signal
             elif signal == -1 and shares > 0:
@@ -157,8 +197,10 @@ class ShortTermStrategy:
         
         if len(trades) > 0:
             print(f"\nAll Trades:")
+            from core_config import PORTFOLIO_CFG
+            shares_fmt = "8.4f" if PORTFOLIO_CFG.FRACTIONAL_SHARES_ALLOWED else "7.0f"
             for trade in trades[-10:]:
-                print(f"  {trade[0].strftime('%Y-%m-%d')} {trade[1]:4s} {trade[3]:3d} shares @ ${trade[2]:.2f}")
+                print(f"  {trade[0].strftime('%Y-%m-%d')} {trade[1]:4s} {trade[3]:{shares_fmt}} shares @ ${trade[2]:.2f}")
 
 
 if __name__ == "__main__":

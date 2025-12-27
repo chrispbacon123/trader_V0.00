@@ -1,11 +1,21 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Comprehensive test script to verify all features work correctly
 """
 
 import sys
+import os
 import traceback
 from datetime import datetime, timedelta
+from pathlib import Path
+
+# Add project root to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Set UTF-8 encoding for Windows console
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8')
 
 def test_imports():
     """Test all required imports"""

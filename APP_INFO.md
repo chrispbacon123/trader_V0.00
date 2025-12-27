@@ -2,12 +2,18 @@
 
 ## 🎯 How to Start the Application
 
-### Simplest Method
+### Windows
+```powershell
+cd trader_V0.00
+python advanced_trading_interface.py
+```
+
+### Mac/Linux
 ```bash
 cd ~/lean-trading && python3 advanced_trading_interface.py
 ```
 
-### Or use the quick launcher
+### Or use the quick launcher (Mac/Linux)
 ```bash
 ~/lean-trading/START.sh
 ```
@@ -223,4 +229,55 @@ The system now includes:
 
 ---
 
-**Ready to start? Run:** `~/lean-trading/START.sh`
+**Ready to start? Run:** `python advanced_trading_interface.py` (Windows) or `~/lean-trading/START.sh` (Mac/Linux)
+
+---
+
+## 🔧 Recent Updates & Fixes (December 2024)
+
+### Data Integrity Improvements ✅
+
+#### Support/Resistance Calculation Fixed
+**Issue:** Support/resistance levels were analyzing entire historical dataset, causing:
+- Mixing of old price ranges from different market conditions
+- Inclusion of irrelevant levels far from current price
+- Potential cross-contamination between symbols
+
+**Resolution:**
+- Limited analysis to recent 100 days only
+- Added 20% price proximity filter
+- Enhanced fallback logic for edge cases
+- Created comprehensive test suite
+
+**Impact:** All market analytics now provide accurate, relevant levels for current trading decisions.
+
+#### Pattern Recognition Enhanced
+**Updates:**
+- Temporal bounds applied to pattern detection
+- Price proximity filtering added
+- Symbol isolation verified
+- Test suite validates data integrity
+
+#### Testing & Validation
+**New Test Suite:** `test_data_integrity.py`
+- Validates support/resistance accuracy
+- Tests symbol isolation
+- Checks for price outliers
+- Verifies Fibonacci level ordering
+
+**Run tests:** `python test_data_integrity.py`
+
+### Dependencies Updated
+- Added `xgboost` for ML strategies
+- Added `optuna` for hyperparameter optimization
+- Updated requirements documentation
+
+### Files Modified
+- `market_analytics.py` - Support/resistance fixes
+- `advanced_indicators.py` - Pattern recognition fixes
+- `test_data_integrity.py` - New validation suite
+- `README.md` - Windows installation added
+- `CHANGELOG.md` - Version 2.1.0 updates
+- `APP_INFO.md` - This file (consolidated docs)
+
+---

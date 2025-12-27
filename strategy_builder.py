@@ -3,10 +3,57 @@ Custom Strategy Builder - Create, test, and export custom trading strategies
 """
 import json
 import os
+import re
 from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Any
+
+def sanitize_identifier(name: str) -> str:
+    """
+    Sanitize a string to be a valid Python identifier
+    
+    Rules:
+    - Must start with letter or underscore
+    - Can only contain letters, numbers, underscore
+    - Cannot be empty
+    
+    Args:
+        name: Input string
+        
+    Returns:
+        Valid Python identifier
+    """
+    # Remove spaces and special chars, keep only alphanumeric and underscore
+    cleaned = re.sub(r'[^a-zA-Z0-9_]', '', name.replace(' ', '_'))
+    
+    # Ensure doesn't start with digit
+    if cleaned and cleaned[0].isdigit():
+        cleaned = 'Algo_' + cleaned
+    
+    # If empty after cleaning, use default
+    if not cleaned:
+        cleaned = 'CustomAlgorithm'
+    
+    return cleaned
+
+
+def sanitize_export_basename(name: str, timestamp: str) -> str:
+    """
+    Create a safe export filename base that will never match pytest's test_*.py pattern.
+    
+    Always prefixes with 'export_' to prevent pytest collection issues.
+    
+    Args:
+        name: Strategy name (will be sanitized)
+        timestamp: Timestamp string
+        
+    Returns:
+        Safe filename base like 'export_MyStrategy_20251225_120000'
+    """
+    sanitized_name = sanitize_identifier(name)
+    return f"export_{sanitized_name}_{timestamp}"
+
 
 class StrategyBuilder:
     """Interactive strategy builder with export capabilities"""
@@ -36,8 +83,8 @@ class StrategyBuilder:
         }
         
         # Basic info
-        strategy['name'] = input("\n📝 Strategy Name: ").strip()
-        strategy['description'] = input("📝 Description: ").strip()
+        strategy['name'] = input("\n[INPUT] Strategy Name: ").strip()
+        strategy['description'] = input("[INPUT] Description: ").strip()
         
         # Strategy type
         print("\n🎯 Strategy Type:")
@@ -60,7 +107,7 @@ class StrategyBuilder:
         strategy['type'] = types.get(type_choice, 'custom')
         
         # Technical indicators
-        print("\n📊 Add Technical Indicators (comma separated):")
+        print("\n[INFO] Add Technical Indicators (comma separated):")
         print("Available: SMA, EMA, RSI, MACD, Bollinger, ATR, Stochastic, Volume, OBV")
         indicators_input = input("Indicators: ").strip()
         if indicators_input:
@@ -72,7 +119,7 @@ class StrategyBuilder:
         strategy['parameters']['holding_period'] = int(input("Max holding period (days): ") or "5")
         
         # Entry rules
-        print("\n📈 Entry Rules (type 'done' when finished):")
+        print("\n[ENTRY] Entry Rules (type 'done' when finished):")
         rule_num = 1
         while True:
             rule = input(f"Rule {rule_num}: ").strip()
@@ -82,7 +129,7 @@ class StrategyBuilder:
             rule_num += 1
         
         # Exit rules
-        print("\n📉 Exit Rules (type 'done' when finished):")
+        print("\n[EXIT] Exit Rules (type 'done' when finished):")
         rule_num = 1
         while True:
             rule = input(f"Rule {rule_num}: ").strip()
@@ -92,7 +139,7 @@ class StrategyBuilder:
             rule_num += 1
         
         # Risk management
-        print("\n🛡️  Risk Management:")
+        print("\n[RISK] Risk Management:")
         strategy['risk_management']['position_size_pct'] = float(input("Position size (% of capital, default 10): ") or "10")
         strategy['risk_management']['stop_loss_pct'] = float(input("Stop loss (%, default 5): ") or "5")
         strategy['risk_management']['take_profit_pct'] = float(input("Take profit (%, default 15): ") or "15")
@@ -101,7 +148,7 @@ class StrategyBuilder:
         # Save strategy
         self.save_strategy(strategy)
         
-        print(f"\n✅ Strategy '{strategy['name']}' created successfully!")
+        print(f"\n[OK] Strategy '{strategy['name']}' created successfully!")
         return strategy
     
     def save_strategy(self, strategy: Dict[str, Any]):
@@ -109,7 +156,7 @@ class StrategyBuilder:
         filename = f"{self.strategies_dir}/{strategy['name'].replace(' ', '_')}.json"
         with open(filename, 'w') as f:
             json.dump(strategy, f, indent=2)
-        print(f"💾 Saved to: {filename}")
+        print(f"[SAVED] Saved to: {filename}")
     
     def load_strategy(self, name: str) -> Dict[str, Any]:
         """Load strategy from JSON file"""
@@ -147,8 +194,11 @@ class StrategyBuilder:
     
     def _export_python_class(self, strategy: Dict[str, Any], timestamp: str):
         """Export as standalone Python class"""
-        name = strategy['name'].replace(' ', '')
-        filename = f"{self.exports_dir}/{name}_{timestamp}.py"
+        # Sanitize name to be a valid Python identifier
+        name = sanitize_identifier(strategy['name'])
+        # Use export_ prefix to avoid pytest collection
+        basename = sanitize_export_basename(strategy['name'], timestamp)
+        filename = f"{self.exports_dir}/{basename}.py"
         
         code = f'''"""
 {strategy['name']} - {strategy['description']}
@@ -281,9 +331,10 @@ class {name}Strategy:
             # Check entry
             elif self.position == 0:
                 if self.check_entry_signal(df, idx):
-                    # Buy
+                    # Buy with fractional share support
+                    from sizing import calculate_shares
                     position_value = self.cash * self.position_size_pct
-                    shares = int(position_value / current_price)
+                    shares, _ = calculate_shares(position_value, current_price)
                     if shares > 0:
                         cost = shares * current_price
                         self.cash -= cost
@@ -317,7 +368,7 @@ class {name}Strategy:
 STRATEGY_INFO = {{
     'name': '{strategy['name']}',
     'type': '{strategy['type']}',
-    'created': '{strategy['created']}',
+    'created': '{strategy.get('created', 'N/A')}',
     'description': '{strategy['description']}'
 }}
 '''
@@ -325,13 +376,14 @@ STRATEGY_INFO = {{
         with open(filename, 'w') as f:
             f.write(code)
         
-        print(f"✅ Exported Python class to: {filename}")
-        print(f"📝 Import with: from {name}_{timestamp} import {name}Strategy")
+        print(f"[OK] Exported Python class to: {filename}")
+        print(f"[INPUT] Import with: from {basename} import {name}Strategy")
     
     def _export_json_config(self, strategy: Dict[str, Any], timestamp: str):
         """Export as JSON configuration"""
-        name = strategy['name'].replace(' ', '_')
-        filename = f"{self.exports_dir}/{name}_{timestamp}_config.json"
+        # Use export_ prefix to avoid pytest collection
+        basename = sanitize_export_basename(strategy['name'], timestamp)
+        filename = f"{self.exports_dir}/{basename}_config.json"
         
         config = {
             'strategy': strategy,
@@ -345,12 +397,15 @@ STRATEGY_INFO = {{
         with open(filename, 'w') as f:
             json.dump(config, f, indent=2)
         
-        print(f"✅ Exported JSON config to: {filename}")
+        print(f"[OK] Exported JSON config to: {filename}")
     
     def _export_lean_algorithm(self, strategy: Dict[str, Any], timestamp: str):
         """Export as QuantConnect LEAN algorithm"""
-        name = strategy['name'].replace(' ', '')
-        filename = f"{self.exports_dir}/{name}_{timestamp}_lean.py"
+        # Sanitize name to be a valid Python identifier
+        name = sanitize_identifier(strategy['name'])
+        # Use export_ prefix to avoid pytest collection
+        basename = sanitize_export_basename(strategy['name'], timestamp)
+        filename = f"{self.exports_dir}/{basename}_lean.py"
         
         code = f'''"""
 {strategy['name']} - LEAN Algorithm
@@ -427,9 +482,9 @@ class {name}Algorithm(QCAlgorithm):
         if not holdings.Invested:
             # Check entry signal
             if self.CheckEntrySignal():
-                quantity = int(self.Portfolio.TotalPortfolioValue * self.position_size / self.Securities[self.symbol].Price)
-                self.MarketOrder(self.symbol, quantity)
-                self.Debug(f"BUY: {{quantity}} shares at {{self.Securities[self.symbol].Price}}")
+                # Use SetHoldings for fractional share support
+                self.SetHoldings(self.symbol, self.position_size)
+                self.Debug(f"BUY: Set holdings to {{self.position_size*100}}% at {{self.Securities[self.symbol].Price}}")
         else:
             # Check exit signal
             if self.CheckExitSignal():
@@ -463,18 +518,18 @@ class {name}Algorithm(QCAlgorithm):
 
 # Strategy metadata
 # Type: {strategy['type']}
-# Created: {strategy['created']}
+# Created: {strategy.get('created', 'N/A')}
 '''
         
         with open(filename, 'w') as f:
             f.write(code)
         
-        print(f"✅ Exported LEAN algorithm to: {filename}")
-        print(f"📝 Upload to QuantConnect or run locally with LEAN CLI")
+        print(f"[OK] Exported LEAN algorithm to: {filename}")
+        print(f"    Upload to QuantConnect or run locally with LEAN CLI")
     
     def compare_strategies(self, strategy_names: List[str], symbol: str, start_date: str, end_date: str):
         """Compare multiple strategies side by side"""
-        print(f"\n📊 Comparing {len(strategy_names)} strategies on {symbol}")
+        print(f"\n[INFO] Comparing {len(strategy_names)} strategies on {symbol}")
         print(f"Period: {start_date} to {end_date}")
         print("="*80)
         

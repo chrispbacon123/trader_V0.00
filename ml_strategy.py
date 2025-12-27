@@ -1,10 +1,27 @@
 """
 ML-Powered Trading Strategy with Feature Engineering
 Combines technical indicators with gradient boosting for prediction
+Uses canonical data and centralized sizing
 """
 
-import yfinance as yf
 import pandas as pd
+
+# Lazy import yfinance - optional dependency
+yf = None
+
+def _ensure_yfinance():
+    """Lazy load yfinance when needed"""
+    global yf
+    if yf is None:
+        try:
+            import yfinance as yf_module
+            yf = yf_module
+        except ImportError:
+            raise ImportError(
+                "yfinance is required for data download. "
+                "Install with: pip install yfinance"
+            )
+    return yf
 import numpy as np
 from datetime import datetime, timedelta
 import xgboost as xgb
@@ -12,6 +29,10 @@ from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import accuracy_score, precision_score, recall_score
 import warnings
 warnings.filterwarnings('ignore')
+
+from canonical_data import CanonicalDataFetcher
+from sizing import calculate_shares, format_shares
+from core_config import PORTFOLIO_CFG
 
 class MLTradingStrategy:
     def __init__(self, symbol='SPY', initial_capital=100000, lookback=60, prediction_horizon=5):
@@ -26,11 +47,12 @@ class MLTradingStrategy:
         
     def download_data(self, start_date, end_date):
         """Download historical data - request extra days to account for trading days only"""
+        yf_module = _ensure_yfinance()
         # Add buffer for weekends/holidays (multiply by 1.5 to get enough trading days)
         days_diff = (end_date - start_date).days
         buffer_start = end_date - timedelta(days=int(days_diff * 1.5))
         
-        data = yf.download(self.symbol, start=buffer_start, end=end_date, progress=False)
+        data = yf_module.download(self.symbol, start=buffer_start, end=end_date, progress=False)
         if isinstance(data.columns, pd.MultiIndex):
             data.columns = data.columns.droplevel(1)
         return data
@@ -40,29 +62,38 @@ class MLTradingStrategy:
         return self.create_features(data)
     
     def create_features(self, data):
-        """Create technical indicators and features"""
+        """Create technical indicators and features using canonical Price column"""
         df = data.copy()
         
-        # Price-based features
-        df['Returns'] = df['Close'].pct_change()
-        df['Log_Returns'] = np.log(df['Close'] / df['Close'].shift(1))
+        # Ensure we have canonical Price column
+        if 'Price' not in df.columns:
+            if 'Adj Close' in df.columns:
+                df['Price'] = df['Adj Close']
+            elif 'Close' in df.columns:
+                df['Price'] = df['Close']
+            else:
+                raise ValueError("No price column found")
+        
+        # Price-based features (use canonical Price)
+        df['Returns'] = df['Price'].pct_change()
+        df['Log_Returns'] = np.log(df['Price'] / df['Price'].shift(1))
         
         # Moving averages
         for period in [5, 10, 20, 50]:
-            df[f'SMA_{period}'] = df['Close'].rolling(window=period).mean()
-            df[f'EMA_{period}'] = df['Close'].ewm(span=period, adjust=False).mean()
-            df[f'Price_to_SMA_{period}'] = df['Close'] / df[f'SMA_{period}']
+            df[f'SMA_{period}'] = df['Price'].rolling(window=period).mean()
+            df[f'EMA_{period}'] = df['Price'].ewm(span=period, adjust=False).mean()
+            df[f'Price_to_SMA_{period}'] = df['Price'] / df[f'SMA_{period}']
         
         # Volatility
         df['Volatility_20'] = df['Returns'].rolling(window=20).std()
         df['Volatility_50'] = df['Returns'].rolling(window=50).std()
         
-        # Momentum indicators
-        df['ROC_10'] = ((df['Close'] - df['Close'].shift(10)) / df['Close'].shift(10)) * 100
-        df['ROC_20'] = ((df['Close'] - df['Close'].shift(20)) / df['Close'].shift(20)) * 100
+        # Momentum indicators (use canonical Price)
+        df['ROC_10'] = ((df['Price'] - df['Price'].shift(10)) / df['Price'].shift(10)) * 100
+        df['ROC_20'] = ((df['Price'] - df['Price'].shift(20)) / df['Price'].shift(20)) * 100
         
-        # RSI
-        delta = df['Close'].diff()
+        # RSI (use canonical Price)
+        delta = df['Price'].diff()
         gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
         rs = gain / loss
@@ -191,10 +222,29 @@ class MLTradingStrategy:
         
         return df
     
-    def backtest(self, start_date, end_date, train_test_split=0.7):
-        """Run backtest with train/test split"""
-        print("\nDownloading data...")
-        data = self.download_data(start_date, end_date)
+    def backtest(self, start_date, end_date, train_test_split=0.7, data=None):
+        """
+        Run backtest with train/test split
+        
+        Args:
+            start_date: Start date for backtest
+            end_date: End date for backtest
+            train_test_split: Train/test split ratio
+            data: Optional pre-fetched DataFrame. If None, will download.
+        """
+        # Use provided data or download
+        if data is None:
+            print("\nDownloading data...")
+            data = self.download_data(start_date, end_date)
+        else:
+            # Normalize provided data
+            from data_normalization import DataNormalizer
+            normalizer = DataNormalizer()
+            data, _ = normalizer.normalize_market_data(
+                data.copy(), 
+                symbol=self.symbol, 
+                require_ohlc=False
+            )
         
         # Validate data
         if data is None or len(data) == 0:
@@ -241,12 +291,18 @@ class MLTradingStrategy:
             if pd.isna(row['Signal']):
                 continue
                 
-            price = row['Close']
+            price = row['Price'] if 'Price' in row else row['Close']
             signal = row['Signal']
             
-            # Execute trades
+            # Execute trades with centralized sizing
             if signal == 1 and shares == 0:  # Buy
-                shares = int(self.cash * 0.95 / price)
+                target_cash = self.cash * 0.95
+                shares, cash_residual = calculate_shares(
+                    target_value=target_cash,
+                    price=price,
+                    fractional_allowed=PORTFOLIO_CFG.FRACTIONAL_SHARES_ALLOWED
+                )
+                
                 cost = shares * price
                 self.cash -= cost
                 trades.append((date, 'BUY', price, shares, row['Prediction_Proba']))
@@ -298,8 +354,9 @@ class MLTradingStrategy:
         print(f"Win Rate: {win_rate:.2f}%")
         
         print(f"\nRecent Trades (with ML confidence):")
+        shares_fmt = format_shares(shares=0, fractional_allowed=PORTFOLIO_CFG.FRACTIONAL_SHARES_ALLOWED)
         for trade in trades[-8:]:
-            print(f"  {trade[0].strftime('%Y-%m-%d')} - {trade[1]} {trade[3]} shares @ ${trade[2]:.2f} (conf: {trade[4]:.3f})")
+            print(f"  {trade[0].strftime('%Y-%m-%d')} - {trade[1]} {trade[3]:{shares_fmt}} shares @ ${trade[2]:.2f} (conf: {trade[4]:.3f})")
 
 if __name__ == "__main__":
     # Initialize ML strategy

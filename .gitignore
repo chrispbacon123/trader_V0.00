@@ -29,6 +29,10 @@ results/
 backtests/
 saved_strategies/
 saved_portfolios/
+strategy_exports/
+custom_strategies/
+live_strategies/
+data_cache/
 *.csv
 *.json
 *.pkl

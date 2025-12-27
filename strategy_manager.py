@@ -97,7 +97,7 @@ class StrategyManager:
             name: config.to_dict()
             for name, config in self.strategies.items()
         }
-        safe_json_save(data, self.config_file)
+        safe_json_save(self.config_file, data)
     
     def save_strategy(self, config: StrategyConfig) -> bool:
         """Save a strategy configuration"""

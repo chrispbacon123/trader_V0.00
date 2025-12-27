@@ -1,1 +1,16 @@
-{}
+{
+  "TestStrategy": {
+    "name": "TestStrategy",
+    "strategy_type": "mean_reversion",
+    "parameters": {
+      "lookback": 20,
+      "std_dev": 2.0
+    },
+    "description": "",
+    "tags": [],
+    "created_at": "2025-12-26T19:29:06.720515",
+    "last_modified": "2025-12-26T19:29:06.720515",
+    "performance_history": [],
+    "metadata": {}
+  }
+}

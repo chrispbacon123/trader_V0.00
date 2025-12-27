@@ -2,7 +2,6 @@
 Advanced Data Manager with caching, validation, and multiple data sources
 """
 
-import yfinance as yf
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Optional, Tuple
@@ -13,6 +12,23 @@ import json
 from pathlib import Path
 
 warnings.filterwarnings('ignore')
+
+# Lazy import yfinance - only when needed
+yf = None
+
+def _ensure_yfinance():
+    """Lazy load yfinance when needed for live data"""
+    global yf
+    if yf is None:
+        try:
+            import yfinance as yf_module
+            yf = yf_module
+        except ImportError:
+            raise ImportError(
+                "yfinance is required to fetch live market data.\n"
+                "Install it with: pip install yfinance\n"
+                "Or provide data via CSV/DataFrame to avoid this dependency."
+            )
 
 
 class DataManager:
@@ -64,6 +80,7 @@ class DataManager:
         
         # Fetch from Yahoo Finance
         try:
+            _ensure_yfinance()
             ticker = yf.Ticker(symbol)
             df = ticker.history(start=start_date, end=end_date, auto_adjust=True)
             
@@ -254,6 +271,7 @@ class DataManager:
     def get_market_info(self, symbol: str) -> Dict:
         """Get detailed market information"""
         try:
+            _ensure_yfinance()
             ticker = yf.Ticker(symbol)
             info = ticker.info
             

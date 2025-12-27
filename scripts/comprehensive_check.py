@@ -5,7 +5,10 @@ Tests all features systematically
 """
 
 import sys
-sys.path.insert(0, '/Users/jonathanbrooks/lean-trading')
+from pathlib import Path
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from datetime import datetime, timedelta
 from simple_strategy import SimpleMeanReversionStrategy

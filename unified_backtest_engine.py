@@ -99,6 +99,21 @@ class UnifiedBacktestEngine:
                     raise ValueError(f"Unexpected backtest return format: {len(result)} values")
             else:
                 raise ValueError(f"Backtest must return tuple, got {type(result)}")
+            
+            # Normalize equity to Series if it's a list of dicts or list of values
+            if isinstance(equity, list):
+                if len(equity) > 0:
+                    if isinstance(equity[0], dict):
+                        # List of {'Date': ..., 'Value': ...} dicts
+                        equity = pd.Series(
+                            [e.get('Value', e.get('value', initial_capital)) for e in equity],
+                            index=[e.get('Date', e.get('date')) for e in equity] if 'Date' in equity[0] or 'date' in equity[0] else None
+                        )
+                    else:
+                        # List of numeric values
+                        equity = pd.Series(equity)
+                else:
+                    equity = pd.Series([initial_capital, final_value])
                 
         except Exception as e:
             # Return failed result
@@ -178,24 +193,51 @@ class UnifiedBacktestEngine:
         
         # Trade analysis
         try:
-            winning_trades = [t for t in trades if t.get('profit', t.get('pnl', 0)) > 0]
-            losing_trades = [t for t in trades if t.get('profit', t.get('pnl', 0)) < 0]
+            # Helper to extract profit from trades (handles tuple and dict formats)
+            def get_trade_profit(trade):
+                if isinstance(trade, dict):
+                    return trade.get('profit', trade.get('pnl', 0))
+                elif isinstance(trade, (tuple, list)) and len(trade) >= 4:
+                    # Trade format: (date, action, price, shares) - can't compute profit from single trade
+                    return None  # Return None to signal we can't extract profit
+                return 0
+            
+            # Try to get profits - if trades are tuples, we need to pair BUY/SELL
+            profits = []
+            if trades and isinstance(trades[0], (tuple, list)):
+                # Tuple format - calculate profits from BUY/SELL pairs
+                buy_trades = [(t[0], t[2], t[3]) for t in trades if len(t) >= 4 and str(t[1]).upper() == 'BUY']
+                sell_trades = [(t[0], t[2], t[3]) for t in trades if len(t) >= 4 and str(t[1]).upper() == 'SELL']
+                # Match pairs in order
+                for i, (buy_date, buy_price, buy_shares) in enumerate(buy_trades):
+                    if i < len(sell_trades):
+                        sell_date, sell_price, sell_shares = sell_trades[i]
+                        profit = (sell_price - buy_price) * min(buy_shares, sell_shares)
+                        profits.append(profit)
+            else:
+                # Dict format with profit/pnl keys
+                for t in trades:
+                    p = get_trade_profit(t)
+                    if p is not None:
+                        profits.append(p)
+            
+            winning_trades = [p for p in profits if p > 0]
+            losing_trades = [p for p in profits if p < 0]
             
             metrics['winning_trades'] = len(winning_trades)
             metrics['losing_trades'] = len(losing_trades)
-            metrics['win_rate'] = (len(winning_trades) / len(trades)) * 100 if trades else 0
+            metrics['win_rate'] = (len(winning_trades) / len(profits)) * 100 if profits else 0
             
             if winning_trades:
-                avg_win = np.mean([t.get('profit', t.get('pnl', 0)) for t in winning_trades])
+                avg_win = np.mean(winning_trades)
                 metrics['avg_win'] = avg_win
             
             if losing_trades:
-                avg_loss = np.mean([t.get('profit', t.get('pnl', 0)) for t in losing_trades])
+                avg_loss = np.mean(losing_trades)
                 metrics['avg_loss'] = avg_loss
             
             if losing_trades and winning_trades:
-                metrics['profit_factor'] = abs(metrics['avg_win'] * len(winning_trades) / 
-                                              (metrics['avg_loss'] * len(losing_trades)))
+                metrics['profit_factor'] = abs(sum(winning_trades) / sum(losing_trades))
         except Exception as e:
             metrics['calculation_error'] = str(e)
         

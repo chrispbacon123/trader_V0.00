@@ -1,14 +1,31 @@
 """
 Robust utility functions with comprehensive error handling
 """
-import yfinance as yf
 from datetime import datetime, timedelta
 import sys
 import io
 
+# Lazy import yfinance - only when needed
+yf = None
+
+def _ensure_yfinance():
+    """Lazy load yfinance when needed for live data"""
+    global yf
+    if yf is None:
+        try:
+            import yfinance as yf_module
+            yf = yf_module
+        except ImportError:
+            raise ImportError(
+                "yfinance is required to fetch live market data.\n"
+                "Install it with: pip install yfinance\n"
+                "Or provide data via CSV/DataFrame to avoid this dependency."
+            )
+
 def safe_download_data(symbol, days):
     """Safely download data with error handling"""
     try:
+        _ensure_yfinance()
         end = datetime.now()
         start = end - timedelta(days=int(days * 1.5))
         data = yf.download(symbol, start=start, end=end, progress=False)
