@@ -292,7 +292,7 @@ python run_deterministic_tests.py
 - All tests are reproducible and seeded
 
 **Documentation:**
-- See `DETERMINISTIC_TESTS_COMPLETE.md` for full details
+- See [TESTING.md](TESTING.md) for full testing details
 - Pytest suite also available in `tests/test_comprehensive.py`
 
 ### Validated Modules
